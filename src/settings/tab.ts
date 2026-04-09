@@ -495,6 +495,29 @@ class ProfilesSection {
                     });
             });
 
+        // Extra Parameters
+        new Setting(this.container)
+            .setName("Extra parameters")
+            .setDesc(`${profile.name} | Only applicable to OpenAI-compatible providers. Additional parameters passed to the API (JSON format). Example: {"chat_template_kwargs": {"enable_thinking": false}}`)
+            .addTextArea((text) => {
+                text.inputEl.rows = 5;
+                text.setValue(JSON.stringify(profile.completionOptions.extraParams, null, 2))
+                    .setPlaceholder("{}")
+                    .onChange(async (value) => {
+                        try {
+                            const params = value.trim() ? JSON.parse(value) : {};
+                            if (typeof params === 'object' && params !== null && !Array.isArray(params)) {
+                                profile.completionOptions.extraParams = params;
+                                await this.plugin.saveSettings();
+                            } else {
+                                new Notice("Extra parameters must be a valid JSON object");
+                            }
+                        } catch (e) {
+                            new Notice("Invalid JSON format");
+                        }
+                    });
+            });
+
         // System Prompt
         new Setting(this.container)
             .setName("System prompt")
