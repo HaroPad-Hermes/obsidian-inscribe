@@ -9,4 +9,5 @@ export interface OpenAICompatibleSettings {
     models: string[];
     configured: boolean;
     temperature_range: { min: number; max: number };
+    extraParams: Record<string, unknown>;
 }

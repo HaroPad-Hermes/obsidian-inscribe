@@ -118,6 +118,29 @@ export class ProviderSettingsModal extends Modal {
 
         this.renderModelSettings(this.plugin.settings.providers.openai_compatible);
         this.renderConnectionStatus(this.plugin.settings.providers.openai_compatible);
+
+        new Setting(contentEl)
+            .setName("Extra parameters")
+            .setDesc("Additional parameters passed to the API (JSON format). Example: {\"chat_template_kwargs\": {\"enable_thinking\": false}}")
+            .addTextArea((text) => {
+                text.inputEl.rows = 5;
+                text
+                    .setValue(JSON.stringify(this.plugin.settings.providers.openai_compatible.extraParams, null, 2))
+                    .setPlaceholder("{}")
+                    .onChange(async (value) => {
+                        try {
+                            const params = value.trim() ? JSON.parse(value) : {};
+                            if (typeof params === 'object' && params !== null && !Array.isArray(params)) {
+                                this.plugin.settings.providers.openai_compatible.extraParams = params;
+                                await this.plugin.saveSettings();
+                            } else {
+                                new Notice("Extra parameters must be a valid JSON object");
+                            }
+                        } catch (e) {
+                            new Notice("Invalid JSON format");
+                        }
+                    });
+            });
     }
 
     async renderGeminiSettings() {

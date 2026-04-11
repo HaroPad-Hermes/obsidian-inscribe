@@ -110,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
             models: ["gpt-4o", "gpt-4o-mini"],
             configured: false,
             temperature_range: { min: 0, max: 1 },
+            extraParams: {},
         },
         gemini: {
             integration: ProviderType.GEMINI,
