@@ -32,7 +32,7 @@ export class OpenAICompatibleProvider implements Provider {
             ],
             temperature: options.temperature,
             stream: true,
-            ...options.extraParams,
+            ...this.settings.extraParams,
         }, { signal: this.abortcontroller.signal });
 
         let completion = "";
