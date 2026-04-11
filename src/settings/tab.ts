@@ -8,11 +8,11 @@ import { ProviderSettingsModal } from './provider';
 import { createProfile } from ".";
 
 export default class InscribeSettingsTab extends PluginSettingTab {
-    private generalSection: GeneralSection;
-    private suggestionControlSection: SuggestionControlSection;
-    private providersSection: ProvidersSection;
-    private profilesSection: ProfilesSection;
-    private pathConfigsSection: PathConfigsSection;
+    private generalSection!: GeneralSection;
+    private suggestionControlSection!: SuggestionControlSection;
+    private providersSection!: ProvidersSection;
+    private profilesSection!: ProfilesSection;
+    private pathConfigsSection!: PathConfigsSection;
 
     constructor(private plugin: Inscribe) {
         super(plugin.app, plugin);
@@ -153,8 +153,8 @@ class SuggestionControlSection {
                     .addOption("paragraph", "Paragraph by Paragraph")
                     .addOption("full", "Full Completion")
                     .setValue(this.plugin.settings.suggestionControl.splitStrategy)
-                    .onChange(async (value: SplitStrategy) => {
-                        this.plugin.settings.suggestionControl.splitStrategy = value;
+                    .onChange(async (value) => {
+                        this.plugin.settings.suggestionControl.splitStrategy = value as SplitStrategy;
                         await this.plugin.saveSettings();
                     });
             });
@@ -456,8 +456,8 @@ class ProfilesSection {
                     .addOption(ProviderType.GROK, "Grok")
                     .addOption(ProviderType.OPENAI_COMPATIBLE, "OpenAI Compatible")
                     .setValue(profile.provider)
-                    .onChange(async (value: ProviderType) => {
-                        profile.provider = value;
+                    .onChange(async (value) => {
+                        profile.provider = value as ProviderType;
                         await this.plugin.saveSettings();
                         await this.render();
                     });

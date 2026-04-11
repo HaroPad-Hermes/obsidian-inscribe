@@ -3,6 +3,7 @@ import Inscribe from '../main';
 import { ProfileService } from 'src/profile/service';
 import CompletionService from 'src/completions/service';
 import { findPathConfig } from 'src/settings';
+import type { Profile } from 'src/settings';
 
 export default class StatusBarItem {
     private plugin: Inscribe;
@@ -94,11 +95,11 @@ export default class StatusBarItem {
         this.render();
     }
 
-    private handleProfileChange(profile: string): void {
+    private handleProfileChange(_profile: Profile): void {
         this.render();
     }
 
     private updateProfile(profile: string): void {
         setTooltip(this.statusBarItem, `Profile: ${profile}`, { placement: 'top' });
     }
-} 
+}

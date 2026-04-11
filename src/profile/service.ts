@@ -6,8 +6,8 @@ import { DEFAULT_PATH, DEFAULT_PROFILE, findPathConfig, PathConfig, Profile, Set
 // ProfileService class is responsible for tracking the active profile based on the current file path.
 export class ProfileService {
     private plugin: Inscribe;
-    private activeProfile: Profile;
-    private activePath: string;
+    private activeProfile!: Profile;
+    private activePath!: string;
     private app: App;
     private settings: Settings;
     private profileChangeCallbacks: ((profile: Profile) => void)[] = [];

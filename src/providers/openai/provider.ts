@@ -8,7 +8,7 @@ export class OpenAIProvider implements Provider {
     client: OpenAI;
     settings: OpenAISettings;
     aborted: boolean = false;
-    abortcontroller: AbortController;
+    abortcontroller?: AbortController;
 
     constructor(settings: OpenAISettings) {
         this.settings = settings;
@@ -20,7 +20,8 @@ export class OpenAIProvider implements Provider {
 
     async *generate(editor: Editor, prompt: string, options: ProfileOptions): AsyncGenerator<string> {
         this.aborted = false;
-        this.abortcontroller = new AbortController();
+        const abortcontroller = new AbortController();
+        this.abortcontroller = abortcontroller;
 
         const initialPosition = editor.getCursor();
         const stream = await this.client.responses.create({
@@ -29,7 +30,7 @@ export class OpenAIProvider implements Provider {
             input: prompt,
             temperature: options.temperature,
             stream: true,
-        }, { signal: this.abortcontroller.signal });
+        }, { signal: abortcontroller.signal });
 
         let completion = "";
         for await (const event of stream) {
@@ -55,7 +56,7 @@ export class OpenAIProvider implements Provider {
     async abort() {
         if (this.aborted) return;
         this.aborted = true;
-        this.abortcontroller.abort();
+        this.abortcontroller?.abort();
     }
 
     async fetchModels(): Promise<string[]> {

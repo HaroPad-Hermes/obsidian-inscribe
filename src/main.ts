@@ -9,12 +9,12 @@ import StatusBarItem from './statusbar/statusbar';
 import { deepMerge } from './settings/load';
 
 export default class Inscribe extends Plugin {
-	settings: Settings;
-	providerFactory: ProviderFactory;
-	statusBarItem: StatusBarItem;
+	settings!: Settings;
+	providerFactory!: ProviderFactory;
+	statusBarItem!: StatusBarItem;
 
-	private profileService: ProfileService;
-	private completionService: CompletionService;
+	private profileService!: ProfileService;
+	private completionService!: CompletionService;
 
 	async onload() {
 		await this.loadSettings();

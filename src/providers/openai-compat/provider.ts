@@ -8,7 +8,7 @@ export class OpenAICompatibleProvider implements Provider {
     client: OpenAI;
     settings: OpenAICompatibleSettings;
     aborted: boolean = false;
-    abortcontroller: AbortController;
+    abortcontroller?: AbortController;
 
     constructor(settings: OpenAICompatibleSettings) {
         this.settings = settings;
@@ -21,7 +21,8 @@ export class OpenAICompatibleProvider implements Provider {
 
     async *generate(editor: Editor, prompt: string, options: ProfileOptions): AsyncGenerator<string> {
         this.aborted = false;
-        this.abortcontroller = new AbortController();
+        const abortcontroller = new AbortController();
+        this.abortcontroller = abortcontroller;
 
         const initialPosition = editor.getCursor();
         const stream = await this.client.chat.completions.create({
@@ -33,7 +34,7 @@ export class OpenAICompatibleProvider implements Provider {
             temperature: options.temperature,
             stream: true,
             ...this.settings.extraParams,
-        }, { signal: this.abortcontroller.signal });
+        }, { signal: abortcontroller.signal });
 
         let completion = "";
         for await (const chunk of stream) {
@@ -54,7 +55,7 @@ export class OpenAICompatibleProvider implements Provider {
     async abort() {
         if (this.aborted) return;
         this.aborted = true;
-        this.abortcontroller.abort();
+        this.abortcontroller?.abort();
     }
 
     async fetchModels(): Promise<string[]> {
