@@ -8,7 +8,8 @@ import preparePrompt from "src/completions/prompt";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
 
-// Plate-mode: AI 1 decides if the last word is complete (tiny token budget).
+// AI 1: classifies whether the last word is complete. The verdict decides the
+// ghost's leading space (code-side), never the model's raw output.
 const WORD_CHECK_SYSTEM =
     'You check if the last word in a text fragment is complete.\n\n' +
     'Respond with EXACTLY "[Finished]" (with brackets) if the last word is complete.\n' +
@@ -16,6 +17,7 @@ const WORD_CHECK_SYSTEM =
     'CRITICAL: No explanations. No punctuation. No extra text. No spaces. Just the answer.';
 
 const trimTrailing = (s: string): string => s.replace(/\s+$/, "");
+const trimLeading = (s: string): string => s.replace(/^\s+/, "");
 
 export default class CompletionService {
     private app: App;
@@ -99,7 +101,15 @@ export default class CompletionService {
             return;
         }
 
-        // ─── Plate-mode two-prompt flow ───
+        // ─── Plate-mode completion ───
+        // Spacing is decided by CODE, never by the model's output:
+        //  - text ends with a space        -> word boundary clear, single call
+        //  - AI 1 says [Finished]          -> word complete, ghost gets a leading
+        //                                     space (cursor has no trailing space)
+        //  - AI 1 says not finished        -> AI 2 completes the word naturally from
+        //                                     the trailing-space prompt; ghost attaches
+        //                                     with NO leading space ("d " -> "olor ...")
+        // The model's output is always trimmed on both sides before re-spacing.
         const initialPosition = editor.getCursor();
         const system = this.buildSystemPrompt(options);
         const text = prompt;
@@ -114,19 +124,19 @@ export default class CompletionService {
             return result;
         };
 
-        // Case 1: text ends with a space (or is empty) → single continuation call
+        // Case 1: trailing space or empty text — word boundary is unambiguous.
         if (text.endsWith(' ') || text.length === 0) {
             const sentence = await generate(
                 [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text}` }],
                 { maxTokens: options.continuationTokens, temperature: options.temperature });
             if (sentence === null) return;
-            const result = trimTrailing(sentence);
+            const result = trimLeading(trimTrailing(sentence));
             if (!result.trim()) return;
             yield { text: result };
             return;
         }
 
-        // Case 2: two-prompt flow — AI 1 checks if the last word is complete
+        // Case 2: no trailing space — AI 1 classifies the last word.
         const checkResult = await generate(
             [{ role: 'system', content: WORD_CHECK_SYSTEM }, { role: 'user', content: `Text: ${text}\nIs the last word complete?` }],
             { maxTokens: options.wordCheckTokens, temperature: 0.2 });
@@ -135,37 +145,14 @@ export default class CompletionService {
         const checkResponse = checkResult.trim().replace(/^Option\s*[AB]:\s*/i, '');
         const isFinished = checkResponse.toLowerCase().replace(/[^a-z]/g, '') === 'finished';
 
-        if (isFinished) {
-            // Cursor has no trailing space — ghost gets a leading space
-            const sentence = await generate(
-                [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text} ` }],
-                { maxTokens: options.continuationTokens, temperature: options.temperature });
-            if (sentence === null) return;
-            const result = ' ' + trimTrailing(sentence);
-            if (!result.trim()) return;
-            yield { text: result };
-            return;
-        }
-
-        // DeepSeek often returns the full completed word ("ipsum" for "ips") or the
-        // suffix plus continuation ("um dolor..."). Derive the exact missing characters:
-        // the typed prefix is known, so the missing chars = answer minus that prefix.
-        const lastWord = text.split(/\s/).pop() || text;
-        let wordCompletion = checkResponse.trim();
-        if (wordCompletion.startsWith(lastWord) && wordCompletion.length > lastWord.length) {
-            // Model returned the completed word — strip the already-typed prefix
-            wordCompletion = wordCompletion.slice(lastWord.length);
-        }
-        wordCompletion = wordCompletion.split(/\s/)[0] || '';
-
-        // Word is incomplete — the word completion attaches directly at the cursor,
-        // then the sentence continues after it.
-        const completedText = text + wordCompletion;
         const sentence = await generate(
-            [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${completedText} ` }],
+            [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text} ` }],
             { maxTokens: options.continuationTokens, temperature: options.temperature });
         if (sentence === null) return;
-        const result = wordCompletion + ' ' + trimTrailing(sentence);
+
+        const result = isFinished
+            ? ' ' + trimLeading(trimTrailing(sentence))
+            : trimLeading(trimTrailing(sentence));
         if (!result.trim()) return;
         yield { text: result };
     }
