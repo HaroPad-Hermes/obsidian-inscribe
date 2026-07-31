@@ -1,5 +1,5 @@
 import { GeminiSettings } from "./settings";
-import { Provider } from "..";
+import { Provider, ChatMessage, GenerateOnceOptions } from "..";
 import { Editor } from "obsidian";
 import { ProfileOptions } from "src/settings/settings";
 import { GoogleGenAI } from "@google/genai";
@@ -41,6 +41,21 @@ export class GeminiProvider implements Provider {
             completion += chunk.text
             yield completion;
         }
+    }
+
+    async generateOnce(messages: ChatMessage[], opts: GenerateOnceOptions): Promise<string> {
+        const system = messages.find(m => m.role === "system")?.content;
+        const user = messages.filter(m => m.role === "user").map(m => m.content).join("\n");
+        const response = await this.client.models.generateContent({
+            model: opts.model,
+            contents: user,
+            config: {
+                temperature: opts.temperature,
+                maxOutputTokens: opts.maxTokens,
+                systemInstruction: system,
+            },
+        });
+        return response.text || "";
     }
 
     private cursorMoved(editor: Editor, initialPosition: { line: number, ch: number }): boolean {

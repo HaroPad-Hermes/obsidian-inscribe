@@ -1,4 +1,4 @@
-import { Provider } from "..";
+import { Provider, ChatMessage, GenerateOnceOptions } from "..";
 import { Editor } from "obsidian";
 import OpenAI from "openai";
 import { ProfileOptions } from "src/settings/settings";
@@ -49,6 +49,17 @@ export class GrokProvider implements Provider {
             completion += content;
             yield completion;
         }
+    }
+
+    async generateOnce(messages: ChatMessage[], opts: GenerateOnceOptions): Promise<string> {
+        const response = await this.client.chat.completions.create({
+            model: opts.model,
+            messages: messages,
+            temperature: opts.temperature,
+            max_tokens: opts.maxTokens,
+            stream: false,
+        });
+        return response.choices[0]?.message?.content || "";
     }
 
     async abort() {

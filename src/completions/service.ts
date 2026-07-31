@@ -3,10 +3,19 @@ import { ProfileService } from "src/profile/service";
 import { ProviderFactory } from "src/providers/factory";
 import { Suggestion } from "src/extension";
 import { ProfileOptions, Settings } from "src/settings/settings";
-import { Provider } from "src/providers/provider";
+import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
+
+// Plate-mode: AI 1 decides if the last word is complete (tiny token budget).
+const WORD_CHECK_SYSTEM =
+    'You check if the last word in a text fragment is complete.\n\n' +
+    'Respond with EXACTLY "[Finished]" (with brackets) if the last word is complete.\n' +
+    'Respond with ONLY the missing characters if the last word is incomplete.\n\n' +
+    'CRITICAL: No explanations. No punctuation. No extra text. No spaces. Just the answer.';
+
+const trimTrailing = (s: string): string => s.replace(/\s+$/, "");
 
 export default class CompletionService {
     private app: App;
@@ -44,9 +53,14 @@ export default class CompletionService {
         // Stop any previous generation
         await provider.abort();
 
-        const prompt = preparePrompt(activeEditor.editor, options.userPrompt);
+        // Plate-mode uses the raw text up to the cursor (no template).
+        const useTwoPrompt = options.twoPromptFlow && !!provider.generateOnce;
+        const prompt = useTwoPrompt
+            ? this.getPreCursorText(activeEditor.editor)
+            : preparePrompt(activeEditor.editor, options.userPrompt);
+
         this.notifyCompletionStatus(true);
-        yield* this.complete(activeEditor.editor, provider, prompt, options);
+        yield* this.complete(activeEditor.editor, provider, prompt, options, useTwoPrompt);
         this.notifyCompletionStatus(false);
     }
 
@@ -64,22 +78,91 @@ export default class CompletionService {
         }
     }
 
-    private async *complete(editor: Editor, provider: Provider, prompt: string, options: ProfileOptions): AsyncGenerator<Suggestion> {
-        for await (let text of provider.generate(editor, prompt, options)) {
-            text = text.trim();
+    private async *complete(editor: Editor, provider: Provider, prompt: string, options: ProfileOptions, useTwoPrompt: boolean): AsyncGenerator<Suggestion> {
+        // Legacy streaming path (no two-prompt support or disabled)
+        if (!useTwoPrompt || !provider.generateOnce) {
+            for await (let text of provider.generate(editor, prompt, options)) {
+                text = text.trim();
 
-            if (this.settings.suggestionControl.outputLimit.enabled) {
-                const sentences = nlp(text).sentences().out('array');
-                if (sentences.length > this.settings.suggestionControl.outputLimit.sentences) {
-                    // Take only the first N sentences
-                    text = sentences.slice(0, this.settings.suggestionControl.outputLimit.sentences).join(' ');
-                    yield { text: text };
-                    break;
+                if (this.settings.suggestionControl.outputLimit.enabled) {
+                    const sentences = nlp(text).sentences().out('array');
+                    if (sentences.length > this.settings.suggestionControl.outputLimit.sentences) {
+                        // Take only the first N sentences
+                        text = sentences.slice(0, this.settings.suggestionControl.outputLimit.sentences).join(' ');
+                        yield { text: text };
+                        break;
+                    }
                 }
-            }
 
-            yield { text: text };
+                yield { text: text };
+            }
+            return;
         }
+
+        // ─── Plate-mode two-prompt flow ───
+        const initialPosition = editor.getCursor();
+        const system = this.buildSystemPrompt(options);
+        const text = prompt;
+
+        const moved = () => this.cursorMoved(editor, initialPosition);
+        const generate = async (messages: ChatMessage[], opts: Partial<GenerateOnceOptions>): Promise<string | null> => {
+            const result = await provider.generateOnce!(messages, { model: options.model, ...opts });
+            if (moved()) {
+                await provider.abort();
+                return null;
+            }
+            return result;
+        };
+
+        // Case 1: text ends with a space (or is empty) → single continuation call
+        if (text.endsWith(' ') || text.length === 0) {
+            const sentence = await generate(
+                [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text}` }],
+                { maxTokens: options.continuationTokens, temperature: options.temperature });
+            if (sentence !== null) yield { text: trimTrailing(sentence) };
+            return;
+        }
+
+        // Case 2: two-prompt flow — AI 1 checks if the last word is complete
+        const checkResult = await generate(
+            [{ role: 'system', content: WORD_CHECK_SYSTEM }, { role: 'user', content: `Text: ${text}\nIs the last word complete?` }],
+            { maxTokens: options.wordCheckTokens, temperature: 0.2 });
+        if (checkResult === null) return;
+
+        const checkResponse = checkResult.trim().replace(/^Option\s*[AB]:\s*/i, '');
+        const isFinished = checkResponse.toLowerCase().replace(/[^a-z]/g, '') === 'finished';
+
+        if (isFinished) {
+            // Cursor has no trailing space — ghost gets a leading space
+            const sentence = await generate(
+                [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text} ` }],
+                { maxTokens: options.continuationTokens, temperature: options.temperature });
+            if (sentence !== null) yield { text: ' ' + trimTrailing(sentence) };
+            return;
+        }
+
+        // Word is incomplete — the word completion attaches directly at the cursor,
+        // then the sentence continues after it.
+        const completedText = text + checkResponse;
+        const sentence = await generate(
+            [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${completedText} ` }],
+            { maxTokens: options.continuationTokens, temperature: options.temperature });
+        if (sentence !== null) yield { text: checkResponse + ' ' + trimTrailing(sentence) };
+    }
+
+    private getPreCursorText(editor: Editor): string {
+        const cursor = editor.getCursor();
+        return editor.getRange({ line: 0, ch: 0 }, cursor);
+    }
+
+    private buildSystemPrompt(options: ProfileOptions): string {
+        if (!options.aiContext) return options.systemPrompt;
+        const file = this.app.workspace.getActiveFile();
+        if (!file) return options.systemPrompt;
+        const cache = this.app.metadataCache.getFileCache(file);
+        const ctx = cache?.frontmatter?.["ai-context"];
+        if (typeof ctx !== "string" || !ctx.trim()) return options.systemPrompt;
+        return options.systemPrompt + "\n\nDOCUMENT CONTEXT: " + ctx.trim();
     }
 
     private shouldGenerate(editor: Editor): boolean {
@@ -112,5 +195,10 @@ export default class CompletionService {
         }
 
         return true;
+    }
+
+    private cursorMoved(editor: Editor, initialPosition: { line: number, ch: number }): boolean {
+        const currentPosition = editor.getCursor();
+        return currentPosition.line !== initialPosition.line || currentPosition.ch !== initialPosition.ch;
     }
 }

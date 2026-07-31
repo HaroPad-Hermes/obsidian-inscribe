@@ -1,4 +1,4 @@
-import { Provider } from "..";
+import { Provider, ChatMessage, GenerateOnceOptions } from "..";
 import { Editor } from "obsidian";
 import { OpenAICompatibleSettings } from ".";
 import { ProfileOptions } from "src/settings/settings";
@@ -19,6 +19,14 @@ export class OpenAICompatibleProvider implements Provider {
         });
     }
 
+    private buildExtraParams(): Record<string, unknown> {
+        const extra: Record<string, unknown> = { ...this.settings.extraParams };
+        if (this.settings.disableThinking) {
+            extra.thinking = { type: 'disabled' };
+        }
+        return extra;
+    }
+
     async *generate(editor: Editor, prompt: string, options: ProfileOptions): AsyncGenerator<string> {
         this.aborted = false;
         const abortcontroller = new AbortController();
@@ -33,7 +41,7 @@ export class OpenAICompatibleProvider implements Provider {
             ],
             temperature: options.temperature,
             stream: true,
-            ...this.settings.extraParams,
+            ...this.buildExtraParams(),
         }, { signal: abortcontroller.signal });
 
         let completion = "";
@@ -50,6 +58,18 @@ export class OpenAICompatibleProvider implements Provider {
             completion += content;
             yield completion;
         }
+    }
+
+    async generateOnce(messages: ChatMessage[], opts: GenerateOnceOptions): Promise<string> {
+        const response = await this.client.chat.completions.create({
+            model: opts.model,
+            messages: messages,
+            temperature: opts.temperature,
+            max_tokens: opts.maxTokens,
+            stream: false,
+            ...this.buildExtraParams(),
+        });
+        return response.choices[0]?.message?.content || "";
     }
 
     async abort() {

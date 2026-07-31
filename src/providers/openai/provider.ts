@@ -1,4 +1,4 @@
-import { Provider } from "..";
+import { Provider, ChatMessage, GenerateOnceOptions } from "..";
 import { Editor } from "obsidian";
 import { OpenAISettings } from ".";
 import { ProfileOptions } from "src/settings/settings";
@@ -51,6 +51,19 @@ export class OpenAIProvider implements Provider {
             completion += content;
             yield completion;
         }
+    }
+
+    async generateOnce(messages: ChatMessage[], opts: GenerateOnceOptions): Promise<string> {
+        const system = messages.find(m => m.role === "system")?.content;
+        const user = messages.filter(m => m.role === "user").map(m => m.content).join("\n");
+        const response = await this.client.responses.create({
+            model: opts.model,
+            instructions: system,
+            input: user,
+            temperature: opts.temperature,
+            max_output_tokens: opts.maxTokens,
+        });
+        return response.output_text || "";
     }
 
     async abort() {

@@ -1,6 +1,6 @@
 import { ModelResponse, Ollama } from "ollama";
 import { OllamaSettings } from "./settings";
-import { Provider } from "..";
+import { Provider, ChatMessage, GenerateOnceOptions } from "..";
 import { Editor } from "obsidian";
 import { ProfileOptions } from "src/settings/settings";
 
@@ -40,6 +40,22 @@ export class OllamaProvider implements Provider {
             completion += response.response;
             yield completion;
         }
+    }
+
+    async generateOnce(messages: ChatMessage[], opts: GenerateOnceOptions): Promise<string> {
+        const system = messages.find(m => m.role === "system")?.content;
+        const prompt = messages.filter(m => m.role === "user").map(m => m.content).join("\n");
+        const response = await this.client.generate({
+            model: opts.model,
+            prompt: prompt,
+            system: system,
+            stream: false,
+            options: {
+                temperature: opts.temperature,
+                num_predict: opts.maxTokens,
+            },
+        });
+        return response.response;
     }
 
     private cursorMoved(editor: Editor, initialPosition: { line: number, ch: number }): boolean {

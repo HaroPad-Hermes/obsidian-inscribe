@@ -120,6 +120,35 @@ class SuggestionControlSection {
             .setName("Suggestion control")
             .setDesc("Configure how completions are triggered and accepted");
 
+        // Plate Mode (one-click plate-editor-style setup)
+        new Setting(this.container)
+            .setName("Plate mode")
+            .setDesc("One-click setup matching the plate editor copilot: Tab triggers a suggestion when idle and accepts the next word when a suggestion is visible, Esc rejects. Word-by-word acceptance. A full app restart is required after toggling.")
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.plugin.settings.suggestionControl.plateMode)
+                    .onChange(async (value) => {
+                        const sc = this.plugin.settings.suggestionControl;
+                        sc.plateMode = value;
+                        if (value) {
+                            sc.acceptanceHotkey = "Tab";
+                            sc.manualActivationKey = "Tab";
+                            sc.splitStrategy = "word";
+                            sc.delayMs = 0;
+                        } else {
+                            sc.acceptanceHotkey = "Tab";
+                            sc.manualActivationKey = undefined;
+                            sc.splitStrategy = "sentence";
+                            sc.delayMs = 500;
+                        }
+                        await this.plugin.saveSettings();
+                        await this.render();
+                        new Notice(value
+                            ? "Plate mode enabled — restart Obsidian (or reload the plugin) for it to take effect"
+                            : "Plate mode disabled — restart Obsidian (or reload the plugin) for it to take effect");
+                    });
+            });
+
         // Acceptance Hotkey (capturable)
         this.buildHotkeySetting(
             "Acceptance hotkey",

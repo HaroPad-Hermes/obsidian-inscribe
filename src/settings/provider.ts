@@ -116,6 +116,18 @@ export class ProviderSettingsModal extends Modal {
                     });
             });
 
+        new Setting(contentEl)
+            .setName("Disable thinking")
+            .setDesc("Send thinking: {type: 'disabled'} with every request. Required for DeepSeek V4 Flash — without it the model burns its whole token budget on reasoning and returns no text.")
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.plugin.settings.providers.openai_compatible.disableThinking)
+                    .onChange(async (value) => {
+                        this.plugin.settings.providers.openai_compatible.disableThinking = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
         this.renderModelSettings(this.plugin.settings.providers.openai_compatible);
         this.renderConnectionStatus(this.plugin.settings.providers.openai_compatible);
 

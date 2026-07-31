@@ -12,6 +12,12 @@ export interface ProfileOptions {
     userPrompt: string,
     systemPrompt: string,
     temperature: number,
+    // Plate-mode options (two-prompt flow)
+    twoPromptFlow: boolean,
+    wordCheckTokens: number,
+    continuationTokens: number,
+    // Append the `ai-context` frontmatter property to the system prompt
+    aiContext: boolean,
 }
 
 // Profile settings
@@ -26,6 +32,8 @@ export type Profiles = Record<ProfileId, Profile>
 export type Path = string;
 export type PathConfig = { profile: ProfileId, enabled: boolean };
 export type SuggestionControl = {
+    // One-click plate-editor-style setup (Tab dual-role + word split)
+    plateMode: boolean,
     acceptanceHotkey: string,
     manualActivationKey?: string,
     splitStrategy: SplitStrategy,
@@ -68,6 +76,7 @@ export const DEFAULT_PATH = "/";
 export const DEFAULT_SETTINGS: Settings = {
     enabled: false,
     suggestionControl: {
+        plateMode: false,
         acceptanceHotkey: "Tab",
         splitStrategy: "sentence",
         manualActivationKey: "",
@@ -105,12 +114,13 @@ export const DEFAULT_SETTINGS: Settings = {
             integration: ProviderType.OPENAI_COMPATIBLE,
             name: "OpenAI compatible",
             description: "Use OpenAI compatible APIs to generate completions.",
-            apiKey: "api-key",
-            baseUrl: "https://api.openai.com/v1",
-            models: ["gpt-4o", "gpt-4o-mini"],
+            apiKey: "",
+            baseUrl: "https://api.deepseek.com/v1",
+            models: ["deepseek-v4-flash", "gpt-4o", "gpt-4o-mini"],
             configured: false,
             temperature_range: { min: 0, max: 1 },
             extraParams: {},
+            disableThinking: false,
         },
         gemini: {
             integration: ProviderType.GEMINI,
@@ -137,12 +147,16 @@ export const DEFAULT_SETTINGS: Settings = {
     profiles: {
         default: {
             name: "Default profile",
-            provider: ProviderType.OLLAMA,
+            provider: ProviderType.OPENAI_COMPATIBLE,
             completionOptions: {
-                model: "gemma3:12b",
+                model: "deepseek-v4-flash",
                 userPrompt: 'If the last sentence is incomplete, only complete the sentence and nothing else. If the last sentence is complete, generate a new sentence that follows logically:\n---\n{{{pre_cursor}}}',
-                systemPrompt: "You are a writing assistant that predicts and completes sentences in a natural, context-aware manner. Your goal is to continue the user’s text smoothly, maintaining coherence, fluency, and style. Adapt to the user’s writing tone, whether formal, informal, creative, or technical. Ensure that completions feel intuitive, useful, and free of unnecessary repetition. Do not generate completion that includes the prompt itself.",
+                systemPrompt: "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If stuck, return \"0\".",
                 temperature: 0.5,
+                twoPromptFlow: true,
+                wordCheckTokens: 5,
+                continuationTokens: 40,
+                aiContext: true,
             }
         },
     },

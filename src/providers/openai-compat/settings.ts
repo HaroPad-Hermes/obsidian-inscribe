@@ -10,4 +10,6 @@ export interface OpenAICompatibleSettings {
     configured: boolean;
     temperature_range: { min: number; max: number };
     extraParams: Record<string, unknown>;
+    // Send `thinking: {type: 'disabled'}` with every request (DeepSeek V4 models).
+    disableThinking: boolean;
 }
