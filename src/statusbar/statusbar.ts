@@ -1,8 +1,9 @@
-import { Menu, setIcon, setTooltip } from 'obsidian';
+import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 import Inscribe from '../main';
 import { ProfileService } from 'src/profile/service';
 import CompletionService from 'src/completions/service';
 import { findPathConfig } from 'src/settings';
+import { PromptModal } from 'src/settings/prompt-modal';
 import type { Profile } from 'src/settings';
 
 export default class StatusBarItem {
@@ -78,6 +79,18 @@ export default class StatusBarItem {
                 });
         });
         menu.addSeparator();
+        menu.addItem((item) => {
+            item.setTitle("Edit document prompt…")
+                .setIcon("pencil")
+                .onClick(() => {
+                    const file = this.plugin.app.workspace.getActiveFile();
+                    if (!file || file.extension !== "md") {
+                        new Notice("Open a markdown note first");
+                        return;
+                    }
+                    new PromptModal(this.plugin.app, file).open();
+                });
+        });
         menu.addItem((item) => {
             item.setTitle("Open settings")
                 .onClick(() => {

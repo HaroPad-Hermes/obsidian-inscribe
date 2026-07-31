@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import { inlineSuggestions } from "./extension";
 import { Settings, DEFAULT_SETTINGS } from './settings/settings';
 import InscribeSettingsTab from './settings/tab';
@@ -6,6 +6,7 @@ import { ProviderFactory } from './providers/factory';
 import { ProfileService } from './profile/service';
 import CompletionService from './completions/service';
 import StatusBarItem from './statusbar/statusbar';
+import { PromptModal } from './settings/prompt-modal';
 import { deepMerge } from './settings/load';
 
 export default class Inscribe extends Plugin {
@@ -25,6 +26,20 @@ export default class Inscribe extends Plugin {
 		this.statusBarItem = new StatusBarItem(this, this.profileService, this.completionService);
 
 		this.addSettingTab(new InscribeSettingsTab(this));
+
+		this.addCommand({
+			id: "edit-document-prompt",
+			name: "Edit document prompt",
+			callback: () => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file || file.extension !== "md") {
+					new Notice("Open a markdown note first");
+					return;
+				}
+				new PromptModal(this.app, file).open();
+			},
+		});
+
 		await this.setupExtension();
 	}
 
