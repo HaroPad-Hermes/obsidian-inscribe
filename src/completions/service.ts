@@ -119,7 +119,10 @@ export default class CompletionService {
             const sentence = await generate(
                 [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text}` }],
                 { maxTokens: options.continuationTokens, temperature: options.temperature });
-            if (sentence !== null) yield { text: trimTrailing(sentence) };
+            if (sentence === null) return;
+            const result = trimTrailing(sentence);
+            if (!result.trim()) return;
+            yield { text: result };
             return;
         }
 
@@ -137,7 +140,10 @@ export default class CompletionService {
             const sentence = await generate(
                 [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text} ` }],
                 { maxTokens: options.continuationTokens, temperature: options.temperature });
-            if (sentence !== null) yield { text: ' ' + trimTrailing(sentence) };
+            if (sentence === null) return;
+            const result = ' ' + trimTrailing(sentence);
+            if (!result.trim()) return;
+            yield { text: result };
             return;
         }
 
@@ -158,7 +164,10 @@ export default class CompletionService {
         const sentence = await generate(
             [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${completedText} ` }],
             { maxTokens: options.continuationTokens, temperature: options.temperature });
-        if (sentence !== null) yield { text: wordCompletion + ' ' + trimTrailing(sentence) };
+        if (sentence === null) return;
+        const result = wordCompletion + ' ' + trimTrailing(sentence);
+        if (!result.trim()) return;
+        yield { text: result };
     }
 
     private getPreCursorText(editor: Editor): string {
