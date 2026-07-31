@@ -167,13 +167,28 @@ export default class CompletionService {
     }
 
     private buildSystemPrompt(options: ProfileOptions): string {
-        if (!options.aiContext) return options.systemPrompt;
         const file = this.app.workspace.getActiveFile();
         if (!file) return options.systemPrompt;
-        const cache = this.app.metadataCache.getFileCache(file);
-        const ctx = cache?.frontmatter?.["ai-context"];
-        if (typeof ctx !== "string" || !ctx.trim()) return options.systemPrompt;
-        return options.systemPrompt + "\n\nDOCUMENT CONTEXT: " + ctx.trim();
+        const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
+        if (!fm) return options.systemPrompt;
+
+        // Full per-document override: `ai-prompt:` frontmatter replaces the
+        // profile system prompt for this note entirely.
+        const custom = fm["ai-prompt"];
+        if (typeof custom === "string" && custom.trim()) {
+            return custom.trim();
+        }
+
+        // Per-document context: `ai-context:` frontmatter is appended to the
+        // profile system prompt.
+        if (options.aiContext) {
+            const ctx = fm["ai-context"];
+            if (typeof ctx === "string" && ctx.trim()) {
+                return options.systemPrompt + "\n\nDOCUMENT CONTEXT: " + ctx.trim();
+            }
+        }
+
+        return options.systemPrompt;
     }
 
     private shouldGenerate(editor: Editor): boolean {
