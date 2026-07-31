@@ -141,13 +141,24 @@ export default class CompletionService {
             return;
         }
 
+        // DeepSeek often returns the full completed word ("ipsum" for "ips") or the
+        // suffix plus continuation ("um dolor..."). Derive the exact missing characters:
+        // the typed prefix is known, so the missing chars = answer minus that prefix.
+        const lastWord = text.split(/\s/).pop() || text;
+        let wordCompletion = checkResponse.trim();
+        if (wordCompletion.startsWith(lastWord) && wordCompletion.length > lastWord.length) {
+            // Model returned the completed word — strip the already-typed prefix
+            wordCompletion = wordCompletion.slice(lastWord.length);
+        }
+        wordCompletion = wordCompletion.split(/\s/)[0] || '';
+
         // Word is incomplete — the word completion attaches directly at the cursor,
         // then the sentence continues after it.
-        const completedText = text + checkResponse;
+        const completedText = text + wordCompletion;
         const sentence = await generate(
             [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${completedText} ` }],
             { maxTokens: options.continuationTokens, temperature: options.temperature });
-        if (sentence !== null) yield { text: checkResponse + ' ' + trimTrailing(sentence) };
+        if (sentence !== null) yield { text: wordCompletion + ' ' + trimTrailing(sentence) };
     }
 
     private getPreCursorText(editor: Editor): string {
