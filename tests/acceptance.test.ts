@@ -32,8 +32,24 @@ describe("ghost shape per AI1 classification (code behavior)", () => {
         // judged in the battery, where AI1's real answer is visible.
         expect(await flow("Lorem ipsum do", "[Finished]", "lor sit")).toBe(" lor sit");
     });
-    it("complete word + wrongly not-finished → attaches (AI1's verdict is honored)", async () => {
-        expect(await flow("Lorem", "em", "ipsum dolor")).toBe("ipsum dolor");
+    it("complete word + wrongly not-finished → conflict check adds the space (AI2 wins)", async () => {
+        // AI1 says "em" for "Lorem" but the continuation starts a new word —
+        // the suffix doesn't match → leading space (fixes "Loremipsum").
+        expect(await flow("Lorem", "em", "ipsum dolor")).toBe(" ipsum dolor");
+    });
+    it("number prefix: AI1 suffix conflicts with a fresh continuation → leading space", async () => {
+        // Live failure: "the year 202" -> AI1 "02", continuation "The world..."
+        // Without the cross-check the ghost glued: "202The".
+        expect(await flow("the year 202", "02", "The world had changed")).toBe(" The world had changed");
+    });
+    it("number prefix with lowercase new word → conflict still detected", async () => {
+        expect(await flow("the year 202", "02", "was a good year")).toBe(" was a good year");
+    });
+    it("suffix matching the continuation → attaches (consistent verdict)", async () => {
+        expect(await flow("Lorem ipsum d", "ol", "olor sit amet")).toBe("olor sit amet");
+    });
+    it("echo verdict with matching continuation → attaches", async () => {
+        expect(await flow("Lorem ipsum d", "d", "olor sit amet")).toBe("olor sit amet");
     });
     it("trailing space → no added leading space", async () => {
         expect(await flow("Lorem ", "[Finished]", "ipsum dolor")).toBe("ipsum dolor");

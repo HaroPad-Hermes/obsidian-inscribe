@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeGhost, stripMarkdown, isStuckMarker } from "../src/completions/flow";
+import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom } from "../src/completions/flow";
 
 const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
 
@@ -60,10 +60,20 @@ describe("computeGhost — AI1 classification handling", () => {
         });
     }
 
-    const notFinishedVariants = ["Option B: um", "um", "ipsum", "d", "ol", "xyz", "0", ""];
-    for (const v of notFinishedVariants) {
-        it(`treats ${JSON.stringify(v)} as not-finished → no leading space`, async () => {
-            expect(await flow("Lorem ips", v, "um dolor")).toBe("um dolor");
+    const notFinishedVariants: Array<[string, string, string]> = [
+        // [ai1 answer, expected ghost, why]
+        ["Option B: um", "um dolor", "suffix matches continuation → attaches"],
+        ["um", "um dolor", "suffix matches → attaches"],
+        ["ipsum", "um dolor", "full word derived to 'um' → attaches"],
+        ["", "um dolor", "empty answer → no suffix → attaches"],
+        ["d", " um dolor", "suffix conflicts with continuation → AI2 wins, leading space"],
+        ["ol", " um dolor", "suffix conflicts → leading space"],
+        ["xyz", " um dolor", "garbage suffix conflicts → leading space"],
+        ["0", " um dolor", "stuck-like suffix conflicts → leading space"],
+    ];
+    for (const [answer, expected, why] of notFinishedVariants) {
+        it(`treats ${JSON.stringify(answer)} as not-finished → ${expected} (${why})`, async () => {
+            expect(await flow("Lorem ips", answer, "um dolor")).toBe(expected);
         });
     }
 });
@@ -108,6 +118,83 @@ describe("computeGhost — aborts (cursor moved) → null", () => {
     });
     it("continue returns null in the trailing-space path", async () => {
         expect(await flow("Lorem ", "[Finished]", null)).toBeNull();
+    });
+});
+
+describe("computeGhost — sentence limiting", () => {
+    const three = "One sentence. Two sentences! Three?";
+    it("limitSentences keeps only the first sentence", () => {
+        expect(limitSentences(three, 1)).toBe("One sentence.");
+    });
+    it("limitSentences keeps two", () => {
+        expect(limitSentences(three, 2)).toBe("One sentence. Two sentences!");
+    });
+    it("no limit (undefined/0) keeps everything", () => {
+        expect(limitSentences(three, undefined)).toBe(three);
+        expect(limitSentences(three, 0)).toBe(three);
+    });
+    it("fewer sentences than the limit → unchanged", () => {
+        expect(limitSentences("Just one.", 3)).toBe("Just one.");
+    });
+    it("flow applies maxSentences to the ghost", async () => {
+        const g = await computeGhost("Lorem", SYS, {
+            classifyWord: async () => "[Finished]",
+            continueText: async () => "ipsum dolor sit. Second sentence. Third one.",
+        }, { maxSentences: 1 });
+        expect(g).toBe(" ipsum dolor sit.");
+    });
+    it("mid-word completion survives sentence limiting", async () => {
+        const g = await computeGhost("Lorem ipsum d", SYS, {
+            classifyWord: async () => "ol",
+            continueText: async () => "olor sit amet. Sed do eiusmod.",
+        }, { maxSentences: 1 });
+        expect(g).toBe("olor sit amet.");
+    });
+});
+
+describe("buildSystemPromptFrom — per-document prompts", () => {
+    const base = "Base prompt";
+    it("no frontmatter → base prompt", () => {
+        expect(buildSystemPromptFrom(undefined, base, true)).toBe(base);
+    });
+    it("ai-prompt replaces the base entirely", () => {
+        expect(buildSystemPromptFrom({ "ai-prompt": "Custom" }, base, true)).toBe("Custom");
+    });
+    it("ai-prompt wins over ai-context", () => {
+        expect(buildSystemPromptFrom({ "ai-prompt": "Custom", "ai-context": "Ctx" }, base, true)).toBe("Custom");
+    });
+    it("ai-context appends when gated on", () => {
+        expect(buildSystemPromptFrom({ "ai-context": "Writing a report" }, base, true))
+            .toBe("Base prompt\n\nDOCUMENT CONTEXT: Writing a report");
+    });
+    it("ai-context ignored when gated off", () => {
+        expect(buildSystemPromptFrom({ "ai-context": "Writing a report" }, base, false)).toBe(base);
+    });
+    it("empty/whitespace values are ignored", () => {
+        expect(buildSystemPromptFrom({ "ai-prompt": "   " }, base, true)).toBe(base);
+        expect(buildSystemPromptFrom({ "ai-context": "" }, base, true)).toBe(base);
+    });
+    it("non-string values are ignored", () => {
+        expect(buildSystemPromptFrom({ "ai-prompt": 42, "ai-context": true }, base, true)).toBe(base);
+    });
+});
+
+describe("computeGhost — edge inputs", () => {
+    it("unicode text (Swedish) mid-word attaches", async () => {
+        expect(await flow("Hej värld", "en", "en och himmel")).toBe("en och himmel");
+    });
+    it("text ending with a tab goes through the classification path", async () => {
+        // "word\t" does not end with a space → AI1 path, no leading space on attach
+        expect(await flow("word\t", " ", "next")).toBe("next");
+    });
+    it("whitespace-only text → single-call path", async () => {
+        expect(await flow("   ", "[Finished]", "once upon")).toBe("once upon");
+    });
+    it("emoji-ending text: classification path, leading space when finished", async () => {
+        expect(await flow("I love 🍕", "[Finished]", "more than pizza")).toBe(" more than pizza");
+    });
+    it("collapseSpaces collapses tabs too", async () => {
+        expect(await flow("a ", "[Finished]", "b\t\tc  d")).toBe("b c d");
     });
 });
 

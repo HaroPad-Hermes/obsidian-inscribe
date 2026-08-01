@@ -85,6 +85,13 @@ const CASES: Case[] = [
     { typed: "", check: "empty note → continuation from scratch" },
     { typed: "- first item\n- secon", check: "list context, mid-word → completes 'second'; check newline handling" },
     { typed: "The theorem states that E", check: "math-flavored context, mid-word → completes 'E=mc^2' or similar; check $…$ handling" },
+    { typed: "Hej värld", check: "Swedish mid-word → completes 'en' (non-ASCII)" },
+    { typed: "```python\npri", check: "code block context → completes 'nt(' or similar" },
+    { typed: "The energy is $E = m", check: "unclosed math span → completes 'c^2$' or similar" },
+    { typed: "The answer is 3.1", check: "decimal number → complete or continuation; judge" },
+    { typed: "I love 🍕", check: "emoji ending → leading-space continuation" },
+    { typed: "First paragraph.\n\nSecon", check: "paragraph break context → completes 'Second'" },
+    { typed: "The industrial revolution began in the late 18th century when mechanized textile production transformed manufacturing, and this period saw unprecedented changes in agriculture, transportation, and social structures across Europe. The introduction of the steam engine by James Watt in 1769 provided a reliable power source that", check: "long context, mid-word → completes 'could'; judge continuation coherence" },
 ];
 
 it("judgment battery (prints report — judge manually)", async () => {
@@ -98,7 +105,7 @@ it("judgment battery (prints report — judge manually)", async () => {
         const ghost = await computeGhost(c.typed, SYS, {
             classifyWord: async () => ai1,
             continueText: async (p) => chat(SYS, p, 40, 0.5),
-        });
+        }, { maxSentences: 1 });
         const { steps, doc } = simulateTabs(c.typed, ghost ?? "");
         console.log("─".repeat(72));
         console.log(`typed : ${JSON.stringify(c.typed)}`);

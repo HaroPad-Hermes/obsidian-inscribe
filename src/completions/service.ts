@@ -5,7 +5,7 @@ import { Suggestion } from "src/extension";
 import { ProfileOptions, Settings } from "src/settings/settings";
 import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
-import { computeGhost, WORD_CHECK_SYSTEM } from "src/completions/flow";
+import { buildSystemPromptFrom, computeGhost, WORD_CHECK_SYSTEM } from "src/completions/flow";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
 
@@ -115,6 +115,10 @@ export default class CompletionService {
             continueText: (p) => generate(
                 [{ role: 'system', content: system }, { role: 'user', content: p }],
                 { maxTokens: options.continuationTokens, temperature: options.temperature }),
+        }, {
+            maxSentences: this.settings.suggestionControl.outputLimit.enabled
+                ? this.settings.suggestionControl.outputLimit.sentences
+                : undefined,
         });
         if (ghost === null) return;
         yield { text: ghost };
@@ -127,27 +131,8 @@ export default class CompletionService {
 
     private buildSystemPrompt(options: ProfileOptions): string {
         const file = this.app.workspace.getActiveFile();
-        if (!file) return options.systemPrompt;
-        const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-        if (!fm) return options.systemPrompt;
-
-        // Full per-document override: `ai-prompt:` frontmatter replaces the
-        // profile system prompt for this note entirely.
-        const custom = fm["ai-prompt"];
-        if (typeof custom === "string" && custom.trim()) {
-            return custom.trim();
-        }
-
-        // Per-document context: `ai-context:` frontmatter is appended to the
-        // profile system prompt.
-        if (options.aiContext) {
-            const ctx = fm["ai-context"];
-            if (typeof ctx === "string" && ctx.trim()) {
-                return options.systemPrompt + "\n\nDOCUMENT CONTEXT: " + ctx.trim();
-            }
-        }
-
-        return options.systemPrompt;
+        const fm = file ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+        return buildSystemPromptFrom(fm, options.systemPrompt, options.aiContext);
     }
 
     private shouldGenerate(editor: Editor): boolean {

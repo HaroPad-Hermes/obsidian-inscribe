@@ -3,6 +3,8 @@
 // compute the ghost text. All spacing decisions are made HERE (code-side),
 // never derived from the model's raw output.
 
+import nlp from "compromise";
+
 // AI 1: classifies whether the last word is complete. The verdict decides the
 // ghost's leading space (code-side), never the model's raw output.
 export const WORD_CHECK_SYSTEM =
@@ -16,6 +18,37 @@ export const trimLeading = (s: string): string => s.replace(/^\s+/, "");
 // Collapse runs of spaces/tabs (but not newlines) — models sometimes emit
 // double spaces (e.g. "(1/2)  sum_{v ...}").
 export const collapseSpaces = (s: string): string => s.replace(/[ \t]{2,}/g, " ");
+
+// Limit the output to at most `max` sentences (compromise-based, same as the
+// legacy streaming path). Undefined/0 means no limit.
+export function limitSentences(s: string, max?: number): string {
+    if (!max || max <= 0) return s;
+    const sentences = nlp(s).sentences().out("array") as string[];
+    if (sentences.length <= max) return s;
+    return sentences.slice(0, max).join(" ").trimEnd();
+}
+
+// Build the effective system prompt from note frontmatter:
+//  - `ai-prompt`  replaces the profile prompt entirely (always honored)
+//  - `ai-context` appends DOCUMENT CONTEXT (gated by the aiContext toggle)
+export function buildSystemPromptFrom(
+    fm: Record<string, unknown> | undefined,
+    systemPrompt: string,
+    aiContext: boolean
+): string {
+    if (!fm) return systemPrompt;
+    const custom = fm["ai-prompt"];
+    if (typeof custom === "string" && custom.trim()) {
+        return custom.trim();
+    }
+    if (aiContext) {
+        const ctx = fm["ai-context"];
+        if (typeof ctx === "string" && ctx.trim()) {
+            return systemPrompt + "\n\nDOCUMENT CONTEXT: " + ctx.trim();
+        }
+    }
+    return systemPrompt;
+}
 
 // Some models emit "0" (optionally with trailing punctuation) as a learned
 // stuck/refusal token. Treat it as an empty result — no ghost.
@@ -55,6 +88,11 @@ export interface GhostCallbacks {
     continueText: (prompt: string) => Promise<string | null>;
 }
 
+export interface GhostOptions {
+    // Limit the ghost to at most this many sentences (undefined/0 = no limit).
+    maxSentences?: number;
+}
+
 // Compute the ghost text for the given pre-cursor text.
 // Returns null when there is nothing to show (abort, empty, stuck marker).
 //
@@ -67,13 +105,17 @@ export interface GhostCallbacks {
 export async function computeGhost(
     text: string,
     systemPrompt: string,
-    cb: GhostCallbacks
+    cb: GhostCallbacks,
+    options: GhostOptions = {}
 ): Promise<string | null> {
+    const clean = (s: string): string =>
+        trimLeading(trimTrailing(limitSentences(collapseSpaces(stripMarkdown(s)), options.maxSentences)));
+
     // Case 1: trailing space or empty text — word boundary is unambiguous.
     if (text.endsWith(' ') || text.length === 0) {
         const sentence = await cb.continueText(`Continue writing. ${text}`);
         if (sentence === null) return null;
-        const result = trimLeading(trimTrailing(collapseSpaces(stripMarkdown(sentence))));
+        const result = clean(sentence);
         if (!result || isStuckMarker(result)) return null;
         return result;
     }
@@ -88,8 +130,23 @@ export async function computeGhost(
     const sentence = await cb.continueText(`Continue writing. ${text} `);
     if (sentence === null) return null;
 
-    const cleaned = trimLeading(trimTrailing(collapseSpaces(stripMarkdown(sentence))));
+    const cleaned = clean(sentence);
     if (!cleaned || isStuckMarker(cleaned)) return null;
 
-    return isFinished ? ' ' + cleaned : cleaned;
+    if (!isFinished) {
+        // Cross-check AI1's not-finished verdict against AI2's continuation:
+        // if AI1 proposed a suffix but the continuation does NOT start with it,
+        // the model judged the word complete and started a new word — trust AI2
+        // and add the leading space (fixes glued "202The").
+        const lastWord = text.split(/\s/).pop() || text;
+        let suffix = checkResponse.trim();
+        if (suffix.startsWith(lastWord) && suffix.length > lastWord.length) {
+            suffix = suffix.slice(lastWord.length);
+        }
+        suffix = suffix.split(/\s/)[0] || '';
+        const attaches = !suffix || suffix === lastWord || cleaned.startsWith(suffix);
+        return (attaches ? '' : ' ') + cleaned;
+    }
+
+    return ' ' + cleaned;
 }
