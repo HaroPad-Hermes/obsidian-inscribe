@@ -150,6 +150,18 @@ class SuggestionControlSection {
                     });
             });
 
+        new Setting(this.container)
+            .setName("Selection menu edge pull-in")
+            .setDesc("Shift the menu left by half the overflow when it would stick out past the text field's right edge (smooth, no hard clamp).")
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.plugin.settings.suggestionControl.selectionMenuPullIn)
+                    .onChange(async (value) => {
+                        this.plugin.settings.suggestionControl.selectionMenuPullIn = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
         // Plate Mode (one-click plate-editor-style setup)
         new Setting(this.container)
             .setName("Plate mode")

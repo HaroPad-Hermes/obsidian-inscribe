@@ -40,20 +40,23 @@ export function resolveMenuLeft(
 // Pure positioning: vertical placement on the chosen side of the selection
 // ("below" the bottom edge, "above" the top edge), flipping to the other side
 // when the menu would overflow the viewport; the left corner is already
-// resolved by the caller, then softly pulled in when it would stick out past
-// the text field's right edge (0.5px left per 1px of overflow — smooth,
-// rather than a hard clamp). Unit-testable.
+// resolved by the caller, then — when pullIn is enabled — softly pulled in
+// when it would stick out past the text field's right edge (0.5px left per
+// 1px of overflow, rather than a hard clamp). Unit-testable.
 export function computeMenuPosition(
     anchor: { left: number; top: number; bottom: number },
     menu: { width: number; height: number },
     viewport: { width: number; height: number },
     side: SelectionMenuSide,
-    contentRight: number
+    contentRight: number,
+    pullIn: boolean
 ): { left: number; top: number } {
     let left = Math.max(8, anchor.left);
-    const overflow = left + menu.width - contentRight;
-    if (overflow > 0) {
-        left = Math.max(8, left - overflow / 2);
+    if (pullIn) {
+        const overflow = left + menu.width - contentRight;
+        if (overflow > 0) {
+            left = Math.max(8, left - overflow / 2);
+        }
     }
     if (side === "above") {
         const above = anchor.top - menu.height - 6;
@@ -79,7 +82,8 @@ const PRESET_ICONS: Record<string, string> = {
 export function selectionMenuPlugin(
     run: SelectionMenuRunner,
     getPlacement: () => SelectionMenuPlacement,
-    getSide: () => SelectionMenuSide
+    getSide: () => SelectionMenuSide,
+    getPullIn: () => boolean
 ) {
     return ViewPlugin.fromClass(
         class {
@@ -211,7 +215,8 @@ export function selectionMenuPlugin(
                     { width, height: menu.offsetHeight || 34 },
                     { width: window.innerWidth, height: window.innerHeight },
                     getSide(),
-                    anchor.contentRight
+                    anchor.contentRight,
+                    getPullIn()
                 );
                 menu.style.left = `${finalLeft}px`;
                 menu.style.top = `${top}px`;

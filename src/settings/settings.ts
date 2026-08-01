@@ -48,6 +48,9 @@ export type SuggestionControl = {
     // Selection quick-menu side: "below" (under the selection, flips above on
     // overflow) or "above" (over the selection, flips below on overflow).
     selectionMenuSide: SelectionMenuSide,
+    // Soft pull-in: shift the menu left by half the overflow when it would
+    // stick out past the text field's right edge.
+    selectionMenuPullIn: boolean,
     outputLimit: {
         enabled: boolean,
         sentences: number,
@@ -92,6 +95,7 @@ export const DEFAULT_SETTINGS: Settings = {
         manualActivationKey: "",
         selectionMenuPlacement: "smart",
         selectionMenuSide: "below",
+        selectionMenuPullIn: true,
         outputLimit: {
             enabled: true,
             sentences: 1,
