@@ -149,7 +149,13 @@ export function selectionMenuPlugin(
                     return;
                 }
                 const from = this.view.coordsAtPos(sel.from);
-                const to = this.view.coordsAtPos(sel.to);
+                // side=-1 for the end: coordsAtPos defaults to the element
+                // AFTER the position, and at a line-wrap point that is the
+                // first character of the NEXT line — a selection ending in the
+                // line's final space would falsely read as multi-line. The
+                // element before the position (the last selected character)
+                // is on the correct line.
+                const to = this.view.coordsAtPos(sel.to, -1);
                 if (!from || !to) {
                     this.hide();
                     return;
