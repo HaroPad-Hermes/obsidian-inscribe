@@ -12,7 +12,7 @@ describe("computeMenuPosition", () => {
 
     it("flips above the anchor when the menu would overflow the bottom", () => {
         const { top } = computeMenuPosition({ left: 200, top: 1050, bottom: 1070 }, 34, viewport);
-        expect(top).toBe(1044); // anchor.top - height - 6
+        expect(top).toBe(1010); // anchor.top - menuHeight - 6
     });
 
     it("clamps the left edge to 8px for selections near the left border", () => {
