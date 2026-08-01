@@ -19,10 +19,11 @@ export class OpenAICompatibleProvider implements Provider {
         });
     }
 
-    private buildExtraParams(): Record<string, unknown> {
+    private buildExtraParams(thinkingOverride?: "disabled" | "enabled"): Record<string, unknown> {
         const extra: Record<string, unknown> = { ...this.settings.extraParams };
-        if (this.settings.disableThinking) {
-            extra.thinking = { type: 'disabled' };
+        const thinking = thinkingOverride ?? (this.settings.disableThinking ? "disabled" : undefined);
+        if (thinking) {
+            extra.thinking = { type: thinking };
         }
         return extra;
     }
@@ -67,7 +68,7 @@ export class OpenAICompatibleProvider implements Provider {
             temperature: opts.temperature,
             max_tokens: opts.maxTokens,
             stream: false,
-            ...this.buildExtraParams(),
+            ...this.buildExtraParams(opts.thinking),
         });
         return response.choices[0]?.message?.content || "";
     }

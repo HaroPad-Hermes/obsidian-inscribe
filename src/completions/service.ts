@@ -1,4 +1,4 @@
-import { App, Editor } from "obsidian";
+import { App, Editor, MarkdownView, Notice } from "obsidian";
 import { ProfileService } from "src/profile/service";
 import { ProviderFactory } from "src/providers/factory";
 import { Suggestion } from "src/extension";
@@ -6,6 +6,8 @@ import { ProfileOptions, Settings } from "src/settings/settings";
 import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
 import { buildSystemPromptFrom, computeGhost, WORD_VALIDITY_SYSTEM } from "src/completions/flow";
+import { buildRewriteMessages } from "src/completions/rewrite";
+import { DiffSession } from "src/extension/diff";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
 
@@ -139,6 +141,52 @@ export default class CompletionService {
     private getPreCursorText(editor: Editor): string {
         const cursor = editor.getCursor();
         return editor.getRange({ line: 0, ch: 0 }, cursor);
+    }
+
+    // Rewrite the current selection via the active profile's provider. The
+    // selection is wrapped in <selected> markers with surrounding text as
+    // context (up to 8000 chars each side). Returns the diff session for the
+    // inline Accept/Discard view, or null on failure / empty result.
+    async rewriteSelection(instruction: string, thinking: boolean): Promise<DiffSession | null> {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const editor = view?.editor;
+        if (!editor) return null;
+        const selection = editor.getSelection();
+        if (!selection.trim()) return null;
+
+        const profile = this.profileService.getActiveProfile();
+        const provider = this.providerFactory.getProvider(profile.provider);
+        const options = profile.completionOptions;
+
+        const from = editor.posToOffset(editor.getCursor("from"));
+        const to = editor.posToOffset(editor.getCursor("to"));
+        const fullText = editor.getValue();
+
+        const messages = buildRewriteMessages({
+            instruction,
+            selection,
+            before: fullText.slice(0, from),
+            after: fullText.slice(to),
+        });
+
+        try {
+            const result = await provider.generateOnce!(messages, {
+                model: options.model,
+                maxTokens: 1600,
+                temperature: 0.5,
+                thinking: thinking ? "enabled" : "disabled",
+            });
+            const rewritten = (result || "").trim();
+            if (!rewritten) {
+                new Notice("Inscribe: the model returned nothing");
+                return null;
+            }
+            return { from, to, original: selection, rewritten };
+        } catch (error) {
+            console.error("Inscribe: rewrite failed", error);
+            new Notice("Inscribe: rewrite failed — see console");
+            return null;
+        }
     }
 
     private buildSystemPrompt(options: ProfileOptions): string {

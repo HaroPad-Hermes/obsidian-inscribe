@@ -19,6 +19,10 @@ export interface GenerateOnceOptions {
     model: string;
     maxTokens?: number;
     temperature?: number;
+    // Per-call thinking override (OpenAI-compatible providers): "disabled"
+    // forces thinking:{type:"disabled"}; "enabled" forces it on; omitted
+    // falls back to the provider's disableThinking setting.
+    thinking?: "disabled" | "enabled";
 }
 
 // Completer interface for ai integrations

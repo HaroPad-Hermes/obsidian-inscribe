@@ -1,5 +1,6 @@
-import { Notice, Plugin } from 'obsidian';
+import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { inlineSuggestions } from "./extension";
+import { diffSessionState } from "./extension/diff";
 import { Settings, DEFAULT_SETTINGS } from './settings/settings';
 import InscribeSettingsTab from './settings/tab';
 import { ProviderFactory } from './providers/factory';
@@ -7,6 +8,7 @@ import { ProfileService } from './profile/service';
 import CompletionService from './completions/service';
 import StatusBarItem from './statusbar/statusbar';
 import { PromptModal } from './settings/prompt-modal';
+import { RewriteModal } from './settings/rewrite-modal';
 import { deepMerge } from './settings/load';
 
 export default class Inscribe extends Plugin {
@@ -40,6 +42,19 @@ export default class Inscribe extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "edit-selection",
+			name: "Edit selection (AI rewrite)",
+			callback: () => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view || view.editor.getSelection().length === 0) {
+					new Notice("Select some text first");
+					return;
+				}
+				new RewriteModal(this.app, this.completionService).open();
+			},
+		});
+
 		await this.setupExtension();
 	}
 
@@ -50,7 +65,7 @@ export default class Inscribe extends Plugin {
 			acceptanceHotkey: this.settings.suggestionControl.acceptanceHotkey,
 			triggerHotkey: this.settings.suggestionControl.manualActivationKey,
 		});
-		this.registerEditorExtension(extension);
+		this.registerEditorExtension([extension, diffSessionState]);
 	}
 
 	async loadSettings() {

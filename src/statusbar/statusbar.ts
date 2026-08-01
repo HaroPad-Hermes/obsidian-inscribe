@@ -1,9 +1,10 @@
-import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
+import { MarkdownView, Menu, Notice, setIcon, setTooltip } from 'obsidian';
 import Inscribe from '../main';
 import { ProfileService } from 'src/profile/service';
 import CompletionService from 'src/completions/service';
 import { findPathConfig } from 'src/settings';
 import { PromptModal } from 'src/settings/prompt-modal';
+import { RewriteModal } from 'src/settings/rewrite-modal';
 import type { Profile } from 'src/settings';
 
 export default class StatusBarItem {
@@ -89,6 +90,18 @@ export default class StatusBarItem {
                         return;
                     }
                     new PromptModal(this.plugin.app, file).open();
+                });
+        });
+        menu.addItem((item) => {
+            item.setTitle("Edit selection…")
+                .setIcon("wand-2")
+                .onClick(() => {
+                    const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+                    if (!view || view.editor.getSelection().length === 0) {
+                        new Notice("Select some text first");
+                        return;
+                    }
+                    new RewriteModal(this.plugin.app, this.completionService).open();
                 });
         });
         menu.addItem((item) => {

@@ -97,3 +97,40 @@
     background-color: var(--text-muted);
     transform: translateY(-50%);
 }
+/* ── Edit-selection inline diff ── */
+.inscribe-diff-new {
+    background: rgba(92, 207, 255, 0.18);
+    border-radius: 3px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+.inscribe-diff-buttons {
+    margin-left: 8px;
+    display: inline-flex;
+    gap: 4px;
+    vertical-align: middle;
+}
+.inscribe-diff-buttons button {
+    padding: 0 10px;
+    font-size: 11px;
+    line-height: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.inscribe-diff-accept {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+}
+.inscribe-diff-accept:hover {
+    filter: brightness(1.1);
+}
+.inscribe-diff-discard {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+}
+.inscribe-diff-discard:hover {
+    color: var(--text-normal);
+    border-color: var(--text-muted);
+}
