@@ -10,15 +10,16 @@ export interface SelectionMenuRunner {
     (instruction: string, thinking: boolean): Promise<boolean>;
 }
 
-// Pure positioning: the menu's left corner sits at the leftmost edge of the
-// selected text, vertically below the selection's bottom edge, flipping above
-// when it would overflow the viewport. Unit-testable.
+// Pure positioning: the menu's left corner is pinned to the leftmost point of
+// the text field (contentLeft + 8), vertically below the selection's bottom
+// edge, flipping above when it would overflow the viewport. Unit-testable.
 export function computeMenuPosition(
-    anchor: { left: number; top: number; bottom: number },
+    anchor: { top: number; bottom: number },
     menu: { width: number; height: number },
-    viewport: { width: number; height: number }
+    viewport: { width: number; height: number },
+    contentLeft: number
 ): { left: number; top: number } {
-    const left = Math.max(8, anchor.left);
+    const left = contentLeft + 8;
     const below = anchor.bottom + 6;
     const top = below + menu.height > viewport.height - 8 ? Math.max(8, anchor.top - menu.height - 6) : below;
     return { left, top };
@@ -115,25 +116,23 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
                     return;
                 }
                 this.show({
-                    // Left corner at the leftmost edge of the selected text
-                    // (sel.from is always the smaller position).
-                    left: from.left,
                     top: Math.min(from.top, to.top),
                     bottom: Math.max(from.bottom, to.bottom),
                 });
             }
 
-            private show(anchor: { left: number; top: number; bottom: number }) {
+            private show(anchor: { top: number; bottom: number }) {
                 if (!this.menu) this.build();
                 const menu = this.menu!;
                 menu.style.display = "flex";
+                const contentLeft = this.view.contentDOM.getBoundingClientRect().left;
                 const { left, top } = computeMenuPosition(anchor, {
                     width: menu.offsetWidth || 260,
                     height: menu.offsetHeight || 34,
                 }, {
                     width: window.innerWidth,
                     height: window.innerHeight,
-                });
+                }, contentLeft);
                 menu.style.left = `${left}px`;
                 menu.style.top = `${top}px`;
             }
