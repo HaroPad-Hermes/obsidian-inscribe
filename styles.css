@@ -134,3 +134,58 @@
     color: var(--text-normal);
     border-color: var(--text-muted);
 }
+
+/* ── Selection quick-action menu ── */
+.inscribe-selection-menu {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    font-size: 13px;
+}
+.inscribe-selection-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    color: var(--text-normal);
+    cursor: pointer;
+}
+.inscribe-selection-btn:hover {
+    background: var(--background-modifier-hover);
+}
+.inscribe-selection-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+.inscribe-selection-divider {
+    width: 1px;
+    height: 18px;
+    margin: 0 4px;
+    background: var(--background-modifier-border);
+}
+.inscribe-selection-input {
+    width: 150px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 5px;
+    color: var(--text-normal);
+}
+.inscribe-selection-input:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+}
