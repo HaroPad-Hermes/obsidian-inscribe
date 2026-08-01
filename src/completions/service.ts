@@ -100,7 +100,15 @@ export default class CompletionService {
 
         const moved = () => this.cursorMoved(editor, initialPosition);
         const generate = async (messages: ChatMessage[], opts: Partial<GenerateOnceOptions>): Promise<string | null> => {
-            const result = await provider.generateOnce!(messages, { model: options.model, ...opts });
+            let result: string;
+            try {
+                result = await provider.generateOnce!(messages, { model: options.model, ...opts });
+            } catch (error) {
+                // Parallel calls: one failing request must not reject the whole
+                // fetch (Promise.all). Treat it as an abort → no ghost.
+                console.error("Inscribe: completion request failed", error);
+                return null;
+            }
             if (moved()) {
                 await provider.abort();
                 return null;
