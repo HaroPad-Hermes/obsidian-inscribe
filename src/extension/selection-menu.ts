@@ -249,7 +249,7 @@ export function selectionMenuPlugin(
 
                 const divider = document.createElement("span");
                 divider.className = "inscribe-selection-divider";
-                menu.append(divider);
+                // (appended after the input — divider between input and thinking toggle)
 
                 const input = document.createElement("input");
                 input.className = "inscribe-selection-input";
@@ -267,7 +267,7 @@ export function selectionMenuPlugin(
                     }
                 });
                 menu.append(input);
-
+                menu.append(divider);
                 const think = document.createElement("button");
                 think.className = "inscribe-selection-btn";
                 setIcon(think, "brain");
