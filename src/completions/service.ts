@@ -5,7 +5,7 @@ import { Suggestion } from "src/extension";
 import { ProfileOptions, Settings } from "src/settings/settings";
 import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
-import { buildSystemPromptFrom, computeGhost, WORD_CHECK_SYSTEM } from "src/completions/flow";
+import { buildSystemPromptFrom, computeGhost, WORD_VALIDITY_SYSTEM } from "src/completions/flow";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
 
@@ -117,12 +117,16 @@ export default class CompletionService {
         };
 
         const ghost = await computeGhost(text, system, {
-            classifyWord: (t) => generate(
-                [{ role: 'system', content: WORD_CHECK_SYSTEM }, { role: 'user', content: `Text: ${t}\nIs the last word complete?` }],
-                { maxTokens: options.wordCheckTokens, temperature: 0.2 }),
             continueText: (p) => generate(
                 [{ role: 'system', content: system }, { role: 'user', content: p }],
                 { maxTokens: options.continuationTokens, temperature: options.temperature }),
+            isPlausibleWord: async (candidate) => {
+                const r = await generate(
+                    [{ role: 'system', content: WORD_VALIDITY_SYSTEM }, { role: 'user', content: `Is "${candidate}" a plausible word?` }],
+                    { maxTokens: 5, temperature: 0.1 });
+                if (r === null) return null;
+                return r.trim().toUpperCase().startsWith("YES");
+            },
         }, {
             maxSentences: this.settings.suggestionControl.outputLimit.enabled
                 ? this.settings.suggestionControl.outputLimit.sentences

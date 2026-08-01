@@ -10,7 +10,7 @@
 // The single `it` passes unconditionally; the REPORT is the deliverable.
 
 import { it } from "vitest";
-import { computeGhost, WORD_CHECK_SYSTEM } from "../src/completions/flow";
+import { computeGhost, WORD_VALIDITY_SYSTEM } from "../src/completions/flow";
 import { TextSplitStrategies } from "../src/extension/segmentation";
 import fs from "node:fs";
 import os from "node:os";
@@ -74,7 +74,7 @@ const CASES: Case[] = [
     { typed: "Lorem ipsum dolor ", check: "complete sentence + trailing space → continuation 'sit amet…'" },
     { typed: "Lorem ips", check: "mid-word → ghost must attach as 'um …' → doc word must be 'ipsum' (no 'ips um', no 'ipsipsum')" },
     { typed: "Lorem ipsum d", check: "mid-word → ghost 'olor …' → 'dolor' (no 'dd', no 'd olor')" },
-    { typed: "Lorem ipsum do", check: "TRICKY: 'do' is a real word AND a prefix. AI1 may say [Finished] → ghost ' lor…' → 'do lor' = BAD. Judge what actually happens." },
+    { typed: "Lorem ipsum do", check: "TRICKY (now deterministic): do+lor=dolor is a word → must ATTACH → 'dolor'. Judge." },
     { typed: "The quick brown f", check: "mid-word → 'fox'" },
     { typed: "consectet", check: "mid-word → 'consectetur'" },
     { typed: "In the beginning God created the he", check: "mid-word → 'heavens'" },
@@ -101,16 +101,17 @@ it("judgment battery (prints report — judge manually)", async () => {
     }
     console.log(`\nBattery against deepseek-v4-flash — ${CASES.length} cases + design experiment\n`);
     for (const c of CASES) {
-        const ai1 = await chat(WORD_CHECK_SYSTEM, `Text: ${c.typed}\nIs the last word complete?`, 5, 0.2);
         const ghost = await computeGhost(c.typed, SYS, {
-            classifyWord: async () => ai1,
             continueText: async (p) => chat(SYS, p, 40, 0.5),
+            isPlausibleWord: async (candidate) => {
+                const r = (await chat(WORD_VALIDITY_SYSTEM, `Is "${candidate}" a plausible word?`, 5, 0.1)).trim().toUpperCase();
+                return r.startsWith("YES");
+            },
         }, { maxSentences: 1 });
         const { steps, doc } = simulateTabs(c.typed, ghost ?? "");
         console.log("─".repeat(72));
         console.log(`typed : ${JSON.stringify(c.typed)}`);
         console.log(`check : ${c.check}`);
-        console.log(`AI1   : ${JSON.stringify(ai1)}`);
         console.log(`ghost : ${JSON.stringify(ghost)}`);
         console.log(`tabs  : ${JSON.stringify(steps)}`);
         console.log(`doc   : ${JSON.stringify(doc)}`);

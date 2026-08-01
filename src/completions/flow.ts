@@ -5,13 +5,13 @@
 
 import nlp from "compromise";
 
-// AI 1: classifies whether the last word is complete. The verdict decides the
-// ghost's leading space (code-side), never the model's raw output.
-export const WORD_CHECK_SYSTEM =
-    'You check if the last word in a text fragment is complete.\n\n' +
-    'Respond with EXACTLY "[Finished]" (with brackets) if the last word is complete.\n' +
-    'Respond with ONLY the missing characters if the last word is incomplete.\n\n' +
-    'CRITICAL: No explanations. No punctuation. No extra text. No spaces. Just the answer.';
+// The spacing arbiter: asks the model whether the typed word + the
+// continuation's first token form a real word (any language). This decides
+// whether the ghost attaches (word completion: "i"+"psum" -> "ipsum") or gets
+// a leading space (new word: "Lorem"+"ipsum" -> "Loremipsum" is not a word).
+export const WORD_VALIDITY_SYSTEM =
+    'You check if a word looks like a real word (any language, including Latin).\n' +
+    'Respond with EXACTLY "YES" or "NO". No explanations.';
 
 export const trimTrailing = (s: string): string => s.replace(/\s+$/, "");
 export const trimLeading = (s: string): string => s.replace(/^\s+/, "");
@@ -80,12 +80,13 @@ export function stripMarkdown(s: string): string {
 }
 
 export interface GhostCallbacks {
-    // AI 1: receives the raw cursor text, returns its raw answer
-    // (or null if the request was aborted / cursor moved).
-    classifyWord: (text: string) => Promise<string | null>;
     // AI 2: receives the full continuation prompt, returns the raw
     // continuation text (or null if aborted / cursor moved).
     continueText: (prompt: string) => Promise<string | null>;
+    // The spacing arbiter: is `candidate` (typed last word + continuation's
+    // first token) a real word? YES -> the continuation completes the word
+    // (attach); NO -> it starts a new word (leading space). null = aborted.
+    isPlausibleWord: (candidate: string) => Promise<boolean | null>;
 }
 
 export interface GhostOptions {
@@ -120,41 +121,26 @@ export async function computeGhost(
         return result;
     }
 
-    // Case 2: no trailing space — fire AI 1 (classification) and AI 2
-    // (continuation) IN PARALLEL: their prompts are independent, AI 2 always
-    // gets the raw text with a trailing space. Saves AI 1's ~0.3s latency.
-    // (Wasted call only if the cursor moves during that window — results are
-    // dropped anyway.)
-    const [check, sentence] = await Promise.all([
-        cb.classifyWord(text),
-        cb.continueText(`Continue writing. ${text} `),
-    ]);
-    if (check === null || sentence === null) return null;
-
-    const checkResponse = check.trim().replace(/^Option\s*[AB]:\s*/i, '');
-    const isFinished = checkResponse.toLowerCase().replace(/[^a-z]/g, '') === 'finished';
+    // Case 2: no trailing space — the continuation completes the word or
+    // starts a new one. The plausible-word check decides, using the ACTUAL
+    // continuation as evidence ("i"+"psum" = "ipsum" -> attach; "Lorem"+
+    // "ipsum" = "Loremipsum" -> leading space). This replaces AI 1: its
+    // context-free verdict was unreliable for word-prefixes ('i', 'do').
+    const sentence = await cb.continueText(`Continue writing. ${text} `);
+    if (sentence === null) return null;
 
     const cleaned = clean(sentence);
     if (!cleaned || isStuckMarker(cleaned)) return null;
 
-    if (!isFinished) {
-        // Cross-check AI1's not-finished verdict against AI2's continuation.
-        // A leading space is added ONLY when the continuation starts a new
-        // sentence (uppercase/digit) — the model did NOT complete the word
-        // (fixes glued "202The"). Partial AI1 suffixes ('m' for "i") must not
-        // trigger a false conflict: lowercase continuations are word
-        // completions and attach directly ("psum..." -> "ipsum").
-        const lastWord = text.split(/\s/).pop() || text;
-        let suffix = checkResponse.trim();
-        if (suffix.startsWith(lastWord) && suffix.length > lastWord.length) {
-            suffix = suffix.slice(lastWord.length);
-        }
-        suffix = suffix.split(/\s/)[0] || '';
-        const suffixMatches = !!suffix && suffix !== lastWord && cleaned.startsWith(suffix);
-        const startsNewSentence = /^[A-ZÅÄÖ0-9]/.test(cleaned);
-        const attaches = suffixMatches || !startsNewSentence;
-        return (attaches ? '' : ' ') + cleaned;
-    }
+    const lastWord = text.split(/\s/).pop() || text;
+    const firstToken = cleaned.split(/\s/)[0] ?? "";
+    if (!firstToken) return cleaned;
 
-    return ' ' + cleaned;
+    const plausible = await cb.isPlausibleWord(lastWord + firstToken);
+    if (plausible === null) {
+        // Check aborted — conservative fallback: a capitalized continuation
+        // is a new sentence (space); lowercase attaches.
+        return /^[A-ZÅÄÖ0-9]/.test(cleaned) ? ' ' + cleaned : cleaned;
+    }
+    return plausible ? cleaned : ' ' + cleaned;
 }

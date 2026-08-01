@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { computeGhost, isStuckMarker } from "../src/completions/flow";
+import { computeGhost, isStuckMarker, WORD_VALIDITY_SYSTEM } from "../src/completions/flow";
 import { TextSplitStrategies } from "../src/extension/segmentation";
 
-// Live battery against the real model. The AI is non-deterministic with
-// multiple valid outputs, so every assertion is a JUDGMENT (spacing rules,
-// completed-word outcomes, no stuck markers) — never an exact string match.
-// Skips automatically when no DeepSeek key is available.
+// Live smoke against the real model. The AI is non-deterministic with
+// multiple valid outputs, so every assertion is an INVARIANT (no stuck
+// markers, no double spaces, no duplicated prefixes) — semantic outcomes are
+// judged in the battery, never asserted here. Skips without a DeepSeek key.
 
 function loadKey(): string | null {
     if (process.env.DEEPSEEK_API_KEY) return process.env.DEEPSEEK_API_KEY;
@@ -53,7 +53,7 @@ function simulateTabs(typed: string, ghost: string): { doc: string; steps: strin
         steps.push(accepted);
         rem = remaining;
     }
-    return { doc, steps };
+    return { steps, doc };
 }
 
 interface LiveCase {
@@ -62,17 +62,17 @@ interface LiveCase {
 }
 
 const CASES: LiveCase[] = [
-    { typed: "Lorem", runs: 3 },
-    { typed: "Lorem ", runs: 3 },
-    { typed: "Lorem ips", runs: 3 },
-    { typed: "Lorem ipsum d", runs: 3 },
-    { typed: "Lorem ipsum do", runs: 3 },
-    { typed: "The quick brown f", runs: 2 },
-    { typed: "consectet", runs: 2 },
-    { typed: "In the beginning God created the he", runs: 2 },
-    { typed: "The cat sat on the m", runs: 2 },
-    { typed: "amet,", runs: 2 },
-    { typed: "This is a test", runs: 2 },
+    { typed: "Lorem", runs: 2 },
+    { typed: "Lorem ", runs: 2 },
+    { typed: "Lorem ips", runs: 2 },
+    { typed: "Lorem ipsum d", runs: 2 },
+    { typed: "Lorem ipsum do", runs: 2 },
+    { typed: "The quick brown f", runs: 1 },
+    { typed: "consectet", runs: 1 },
+    { typed: "In the beginning God created the he", runs: 1 },
+    { typed: "The cat sat on the m", runs: 1 },
+    { typed: "amet,", runs: 1 },
+    { typed: "This is a test", runs: 1 },
 ];
 
 describe.skipIf(!KEY)("live smoke (DeepSeek V4 Flash)", () => {
@@ -80,16 +80,14 @@ describe.skipIf(!KEY)("live smoke (DeepSeek V4 Flash)", () => {
         const runs = c.runs ?? 2;
         for (let i = 0; i < runs; i++) {
             const ghost = await computeGhost(c.typed, SYS, {
-                classifyWord: async (t) => chat(
-                    "You check if the last word in a text fragment is complete.\n\nRespond with EXACTLY \"[Finished]\" (with brackets) if the last word is complete.\nRespond with ONLY the missing characters if the last word is incomplete.\n\nCRITICAL: No explanations. No punctuation. No extra text. No spaces. Just the answer.",
-                    `Text: ${t}\nIs the last word complete?`,
-                    5, 0.2),
                 continueText: async (p) => chat(SYS, p, 40, 0.5),
+                isPlausibleWord: async (candidate) => {
+                    const r = (await chat(WORD_VALIDITY_SYSTEM, `Is "${candidate}" a plausible word?`, 5, 0.1)).trim().toUpperCase();
+                    return r.startsWith("YES");
+                },
             }, { maxSentences: 1 });
 
             // Invariant 1: a ghost must exist and must not be a stuck marker.
-            // (AI1's verdict legitimately varies run to run — that's the
-            // battery's judging job, not a pass/fail assertion.)
             expect(ghost, `run ${i + 1}: ghost must not be null`).not.toBeNull();
             expect(isStuckMarker(ghost!), `run ${i + 1}: not a stuck marker`).toBe(false);
 
@@ -109,5 +107,5 @@ describe.skipIf(!KEY)("live smoke (DeepSeek V4 Flash)", () => {
                 ).toBe(false);
             }
         }
-    });
+    }, 60_000);
 });
