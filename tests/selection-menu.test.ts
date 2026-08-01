@@ -6,15 +6,15 @@ const menu = { width: 260, height: 34 };
 
 describe("selectionMenuLeft", () => {
     it("hugs the leftmost highlighted character for single-line selections", () => {
-        expect(selectionMenuLeft(200, 300, "Lorem ipsum dolor")).toBe(200);
+        expect(selectionMenuLeft(200, 300, false)).toBe(200);
     });
 
     it("pins to the text field's left edge for multi-line selections", () => {
-        expect(selectionMenuLeft(200, 300, "Lorem ipsum\ndolor sit")).toBe(308); // contentLeft + 8
+        expect(selectionMenuLeft(200, 300, true)).toBe(308); // contentLeft + 8
     });
 
     it("clamps single-line anchors to 8px near the left border", () => {
-        expect(selectionMenuLeft(-40, 300, "Lorem")).toBe(8);
+        expect(selectionMenuLeft(-40, 300, false)).toBe(8);
     });
 });
 

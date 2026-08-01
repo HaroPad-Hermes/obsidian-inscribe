@@ -26,10 +26,11 @@ export function computeMenuPosition(
 }
 
 // Resolve the menu's horizontal anchor: single-line selections hug the
-// leftmost highlighted character; multi-line selections (containing a
-// newline) pin to the text field's left edge. Unit-testable.
-export function selectionMenuLeft(fromLeft: number, contentLeft: number, selectionText: string): number {
-    return selectionText.includes("\n") ? contentLeft + 8 : Math.max(8, fromLeft);
+// leftmost highlighted character; multi-line selections (different visual
+// lines — hard newline OR soft wrap) pin to the text field's left edge.
+// Unit-testable.
+export function selectionMenuLeft(fromLeft: number, contentLeft: number, multiLine: boolean): number {
+    return multiLine ? contentLeft + 8 : Math.max(8, fromLeft);
 }
 
 const PRESET_ICONS: Record<string, string> = {
@@ -122,15 +123,16 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
                     this.hide();
                     return;
                 }
+                // Multi-line detection via geometry: start and end on
+                // different visual lines (hard newline OR soft wrap) have
+                // different top coordinates — sliceDoc's "\n" check misses
+                // wrapped paragraphs.
+                const multiLine = Math.abs(to.top - from.top) > 1;
                 this.show({
-                    // Single-line selection: hug the leftmost highlighted
-                    // character. Multi-line selection: pin to the text field's
-                    // left edge — hugging a character looks awkward across
-                    // wrapped lines/paragraphs.
                     left: selectionMenuLeft(
                         from.left,
                         this.view.contentDOM.getBoundingClientRect().left,
-                        this.view.state.sliceDoc(sel.from, sel.to)
+                        multiLine
                     ),
                     top: Math.min(from.top, to.top),
                     bottom: Math.max(from.bottom, to.bottom),
