@@ -69,14 +69,16 @@ describe("computeGhost — check aborts and fallback", () => {
     });
 });
 
-describe("computeGhost — the check receives the right candidate", () => {
-    it("candidate = typed last word + continuation first token", async () => {
-        let candidate = "";
+describe("computeGhost — the check receives the right inputs", () => {
+    it("candidate = typed last word + continuation first token, with the full text", async () => {
+        let seenText = "";
+        let seenCandidate = "";
         await computeGhost("Lorem ipsum d", SYS, {
             continueText: async () => "olor sit amet",
-            isPlausibleWord: async (c) => { candidate = c; return true; },
+            isPlausibleWord: async (text, candidate) => { seenText = text; seenCandidate = candidate; return true; },
         });
-        expect(candidate).toBe("dolor");
+        expect(seenText).toBe("Lorem ipsum d");
+        expect(seenCandidate).toBe("dolor");
     });
 });
 

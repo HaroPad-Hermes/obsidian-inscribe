@@ -120,9 +120,9 @@ export default class CompletionService {
             continueText: (p) => generate(
                 [{ role: 'system', content: system }, { role: 'user', content: p }],
                 { maxTokens: options.continuationTokens, temperature: options.temperature }),
-            isPlausibleWord: async (candidate) => {
+            isPlausibleWord: async (text, candidate) => {
                 const r = await generate(
-                    [{ role: 'system', content: WORD_VALIDITY_SYSTEM }, { role: 'user', content: `Is "${candidate}" a plausible word?` }],
+                    [{ role: 'system', content: WORD_VALIDITY_SYSTEM }, { role: 'user', content: `Text: "${text}"\nIs "${candidate}" a plausible word to write here?` }],
                     { maxTokens: 5, temperature: 0.1 });
                 if (r === null) return null;
                 return r.trim().toUpperCase().startsWith("YES");

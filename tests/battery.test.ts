@@ -103,7 +103,7 @@ it("judgment battery (prints report — judge manually)", async () => {
     for (const c of CASES) {
         const ghost = await computeGhost(c.typed, SYS, {
             continueText: async (p) => chat(SYS, p, 40, 0.5),
-            isPlausibleWord: async (candidate) => {
+            isPlausibleWord: async (text, candidate) => {
                 const r = (await chat(WORD_VALIDITY_SYSTEM, `Is "${candidate}" a plausible word?`, 5, 0.1)).trim().toUpperCase();
                 return r.startsWith("YES");
             },

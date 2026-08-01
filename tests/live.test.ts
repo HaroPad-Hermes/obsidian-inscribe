@@ -81,7 +81,7 @@ describe.skipIf(!KEY)("live smoke (DeepSeek V4 Flash)", () => {
         for (let i = 0; i < runs; i++) {
             const ghost = await computeGhost(c.typed, SYS, {
                 continueText: async (p) => chat(SYS, p, 40, 0.5),
-                isPlausibleWord: async (candidate) => {
+                isPlausibleWord: async (text, candidate) => {
                     const r = (await chat(WORD_VALIDITY_SYSTEM, `Is "${candidate}" a plausible word?`, 5, 0.1)).trim().toUpperCase();
                     return r.startsWith("YES");
                 },

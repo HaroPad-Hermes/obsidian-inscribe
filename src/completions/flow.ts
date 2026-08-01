@@ -5,12 +5,14 @@
 
 import nlp from "compromise";
 
-// The spacing arbiter: asks the model whether the typed word + the
-// continuation's first token form a real word (any language). This decides
-// whether the ghost attaches (word completion: "i"+"psum" -> "ipsum") or gets
-// a leading space (new word: "Lorem"+"ipsum" -> "Loremipsum" is not a word).
+// The spacing arbiter: asks the model whether the candidate word (typed last
+// word + continuation's first token) is a plausible continuation of the text.
+// The FULL TEXT is included as context, so the model can reject contextually
+// wrong joins ("a"+"mat"=amat is Latin but "a mat" is meant; "in"+"sight"=
+// insight but "in sight" is meant) while accepting real completions
+// ("i"+"psum"=ipsum, "do"+"lor"=dolor).
 export const WORD_VALIDITY_SYSTEM =
-    'You check if a word looks like a real word (any language, including Latin).\n' +
+    'You check if a word is a plausible continuation of a text.\n' +
     'Respond with EXACTLY "YES" or "NO". No explanations.';
 
 export const trimTrailing = (s: string): string => s.replace(/\s+$/, "");
@@ -84,9 +86,10 @@ export interface GhostCallbacks {
     // continuation text (or null if aborted / cursor moved).
     continueText: (prompt: string) => Promise<string | null>;
     // The spacing arbiter: is `candidate` (typed last word + continuation's
-    // first token) a real word? YES -> the continuation completes the word
-    // (attach); NO -> it starts a new word (leading space). null = aborted.
-    isPlausibleWord: (candidate: string) => Promise<boolean | null>;
+    // first token) a plausible continuation of `text`? YES -> the continuation
+    // completes the word (attach); NO -> it starts a new word (space).
+    // null = aborted.
+    isPlausibleWord: (text: string, candidate: string) => Promise<boolean | null>;
 }
 
 export interface GhostOptions {
@@ -136,7 +139,7 @@ export async function computeGhost(
     const firstToken = cleaned.split(/\s/)[0] ?? "";
     if (!firstToken) return cleaned;
 
-    const plausible = await cb.isPlausibleWord(lastWord + firstToken);
+    const plausible = await cb.isPlausibleWord(text, lastWord + firstToken);
     if (plausible === null) {
         // Check aborted — conservative fallback: a capitalized continuation
         // is a new sentence (space); lowercase attaches.
