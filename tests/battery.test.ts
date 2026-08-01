@@ -69,6 +69,25 @@ async function chat(system: string, user: string, maxTokens: number, temperature
     return d.choices[0].message.content ?? "";
 }
 
+// FIM: raw completion with a suffix anchor (the plugin's DeepSeek path).
+async function fim(prompt: string, suffix: string, maxTokens: number, temperature: number): Promise<string> {
+    const res = await fetch("https://api.deepseek.com/beta/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
+        body: JSON.stringify({
+            model: "deepseek-v4-flash",
+            prompt,
+            suffix,
+            max_tokens: maxTokens,
+            temperature,
+            stream: false,
+        }),
+    });
+    if (!res.ok) throw new Error(`FIM HTTP ${res.status}: ${await res.text()}`);
+    const d = (await res.json()) as any;
+    return d.choices?.[0]?.text ?? "";
+}
+
 function simulateTabs(typed: string, ghost: string): { steps: string[]; doc: string } {
     let doc = typed;
     let rem = ghost;
@@ -85,6 +104,7 @@ function simulateTabs(typed: string, ghost: string): { steps: string[]; doc: str
 interface Case {
     typed: string;
     check: string; // what to verify when judging
+    suffix?: string; // text after the cursor — exercises the FIM path
 }
 
 const CASES: Case[] = [
@@ -111,24 +131,44 @@ const CASES: Case[] = [
     { typed: "I love 🍕", check: "emoji ending → leading-space continuation" },
     { typed: "First paragraph.\n\nSecon", check: "paragraph break context → completes 'Second'" },
     { typed: "The industrial revolution began in the late 18th century when mechanized textile production transformed manufacturing, and this period saw unprecedented changes in agriculture, transportation, and social structures across Europe. The introduction of the steam engine by James Watt in 1769 provided a reliable power source that", check: "long context, mid-word → completes 'could'; judge continuation coherence" },
+    // ── Between-sections cases (text after the cursor → FIM path) ──
+    { typed: "Section one is fully written.\n\nThe sec", suffix: "ond section is already partly written below.", check: "BETWEEN SECTIONS (FIM): mid-word at the start of section two → completes 'cond' — must NOT touch section one" },
+    { typed: "The committee reviewed the proposal and re", suffix: "jected it on technical grounds.", check: "BETWEEN SECTIONS (FIM): mid-word mid-paragraph → completes 'jected' — suffix anchor must keep position" },
+    { typed: "Introduction complete.\n\n", suffix: "Methods section follows after the cursor.", check: "BETWEEN SECTIONS (FIM): trailing-space at section boundary → new-section continuation that fits before the suffix" },
+    { typed: "8. His speech was inspiring, and by the end, the audience was on their f", suffix: "\n9. The weather forecast predicts sunny skies, but there is a chance of a thunderstorm.\n10. She glanced at her watch and realized she was already late for the meeting.", check: "BETWEEN SECTIONS (FIM): the reported list-confusion case — completes 'eet…' on item 8, never item 5 or a fresh sentence" },
 ];
 
 interface CaseResult {
     ghost: string | null;
     steps: string[];
     doc: string;
+    method: "fim" | "chat";
+    checkUsed: boolean;
+    checkVerdict: boolean | null;
 }
 
 async function runCase(c: Case): Promise<CaseResult> {
+    let method: "fim" | "chat" = "chat";
+    let checkUsed = false;
+    let checkVerdict: boolean | null = null;
     const ghost = await computeGhost(c.typed, SYS, {
-        continueText: async (p) => chat(SYS, p, 40, 0.5),
+        continueText: async (p, raw) => {
+            // Mirror the service: FIM when the case has text after the cursor.
+            if (raw !== undefined && c.suffix) {
+                method = "fim";
+                return fim(raw, c.suffix, 40, 0.5);
+            }
+            return chat(SYS, p, 40, 0.5);
+        },
         isPlausibleWord: async (text, candidate) => {
+            checkUsed = true;
             const r = (await chat(WORD_VALIDITY_SYSTEM, `Text: "${text}"\nIs "${candidate}" a plausible word to write here?`, 5, 0.1)).trim().toUpperCase();
-            return r.startsWith("YES");
+            checkVerdict = r.startsWith("YES");
+            return checkVerdict;
         },
     }, { maxSentences: 1 });
     const { steps, doc } = simulateTabs(c.typed, ghost ?? "");
-    return { ghost, steps, doc };
+    return { ghost, steps, doc, method, checkUsed, checkVerdict };
 }
 
 it("judgment battery (prints report — judge manually)", async () => {
@@ -147,14 +187,18 @@ it("judgment battery (prints report — judge manually)", async () => {
     }
     for (let i = 0; i < CASES.length; i++) {
         const c = CASES[i];
-        const { ghost, steps, doc } = results[i];
+        const { ghost, steps, doc, method, checkUsed, checkVerdict } = results[i];
         console.log("─".repeat(72));
-        console.log(`typed : ${JSON.stringify(c.typed)}`);
+        console.log(`typed : ${JSON.stringify(c.typed)}${c.suffix ? "  [suffix: " + JSON.stringify(c.suffix.slice(0, 60)) + "…]" : ""}`);
         console.log(`check : ${c.check}`);
+        console.log(`path  : ${method} | plausible-word check: ${checkUsed ? `USED → ${checkVerdict ? "attach" : "space"}` : "not called (trailing-space/empty case)"}`);
         console.log(`ghost : ${JSON.stringify(ghost)}`);
         console.log(`tabs  : ${JSON.stringify(steps)}`);
         console.log(`doc   : ${JSON.stringify(doc)}`);
     }
+    const checkCount = results.filter((r) => r.checkUsed).length;
+    const fimCount = results.filter((r) => r.method === "fim").length;
+    console.log(`\nSUMMARY: plausible-word check used in ${checkCount}/${CASES.length} cases (only mid-word cases); FIM path used in ${fimCount} cases.`);
     console.log(`\nElapsed: ${((Date.now() - started) / 1000).toFixed(1)}s (${PARALLEL ? "parallel" : "sequential"})`);
 
     // Design experiment: does the model emit its own leading space when given
