@@ -120,15 +120,19 @@ export async function computeGhost(
         return result;
     }
 
-    // Case 2: no trailing space — AI 1 classifies the last word.
-    const check = await cb.classifyWord(text);
-    if (check === null) return null;
+    // Case 2: no trailing space — fire AI 1 (classification) and AI 2
+    // (continuation) IN PARALLEL: their prompts are independent, AI 2 always
+    // gets the raw text with a trailing space. Saves AI 1's ~0.3s latency.
+    // (Wasted call only if the cursor moves during that window — results are
+    // dropped anyway.)
+    const [check, sentence] = await Promise.all([
+        cb.classifyWord(text),
+        cb.continueText(`Continue writing. ${text} `),
+    ]);
+    if (check === null || sentence === null) return null;
 
     const checkResponse = check.trim().replace(/^Option\s*[AB]:\s*/i, '');
     const isFinished = checkResponse.toLowerCase().replace(/[^a-z]/g, '') === 'finished';
-
-    const sentence = await cb.continueText(`Continue writing. ${text} `);
-    if (sentence === null) return null;
 
     const cleaned = clean(sentence);
     if (!cleaned || isStuckMarker(cleaned)) return null;
