@@ -231,8 +231,7 @@ describe("computeGhost raw continuation argument (FIM)", () => {
     it("passes the windowed raw prefix as the second argument", async () => {
         let receivedPrompt = "";
         let receivedRaw: string | undefined;
-        const ghost = await computeGhost("a
-long text with an unfinished wor", SYS, {
+        const ghost = await computeGhost("a" + "\n" + "long text with an unfinished wor", SYS, {
             continueText: async (prompt, raw) => {
                 receivedPrompt = prompt;
                 receivedRaw = raw;
@@ -241,10 +240,8 @@ long text with an unfinished wor", SYS, {
             isPlausibleWord: async () => true,
         }, { maxSentences: 1 });
         expect(ghost).toBe("d");
-        expect(receivedPrompt).toBe("Continue writing. a
-long text with an unfinished wor ");
-        expect(receivedRaw).toBe("a
-long text with an unfinished wor");
+        expect(receivedPrompt).toBe("Continue writing. a" + "\n" + "long text with an unfinished wor ");
+        expect(receivedRaw).toBe("a" + "\n" + "long text with an unfinished wor");
     });
 
     it("case 1 (trailing space) passes the raw windowed prefix too", async () => {
