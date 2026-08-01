@@ -40,14 +40,21 @@ export function resolveMenuLeft(
 // Pure positioning: vertical placement on the chosen side of the selection
 // ("below" the bottom edge, "above" the top edge), flipping to the other side
 // when the menu would overflow the viewport; the left corner is already
-// resolved by the caller. Unit-testable.
+// resolved by the caller, then softly pulled in when it would stick out past
+// the text field's right edge (0.5px left per 1px of overflow — smooth,
+// rather than a hard clamp). Unit-testable.
 export function computeMenuPosition(
     anchor: { left: number; top: number; bottom: number },
     menu: { width: number; height: number },
     viewport: { width: number; height: number },
-    side: SelectionMenuSide
+    side: SelectionMenuSide,
+    contentRight: number
 ): { left: number; top: number } {
-    const left = Math.max(8, anchor.left);
+    let left = Math.max(8, anchor.left);
+    const overflow = left + menu.width - contentRight;
+    if (overflow > 0) {
+        left = Math.max(8, left - overflow / 2);
+    }
     if (side === "above") {
         const above = anchor.top - menu.height - 6;
         if (above >= 8) return { left, top: above };
@@ -165,9 +172,11 @@ export function selectionMenuPlugin(
                 // different top coordinates — a sliceDoc "\n" check would miss
                 // wrapped paragraphs.
                 const multiLine = Math.abs(to.top - from.top) > 1;
+                const contentRect = this.view.contentDOM.getBoundingClientRect();
                 this.show({
                     fromLeft: from.left,
-                    contentLeft: this.view.contentDOM.getBoundingClientRect().left,
+                    contentLeft: contentRect.left,
+                    contentRight: contentRect.right,
                     multiLine,
                     midX: (from.left + to.right) / 2,
                     top: Math.min(from.top, to.top),
@@ -178,6 +187,7 @@ export function selectionMenuPlugin(
             private show(anchor: {
                 fromLeft: number;
                 contentLeft: number;
+                contentRight: number;
                 multiLine: boolean;
                 midX: number;
                 top: number;
@@ -200,7 +210,8 @@ export function selectionMenuPlugin(
                     { left, top: anchor.top, bottom: anchor.bottom },
                     { width, height: menu.offsetHeight || 34 },
                     { width: window.innerWidth, height: window.innerHeight },
-                    getSide()
+                    getSide(),
+                    anchor.contentRight
                 );
                 menu.style.left = `${finalLeft}px`;
                 menu.style.top = `${top}px`;
