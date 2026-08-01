@@ -37,7 +37,7 @@ export function limitSentences(s: string, max?: number): string {
 // the model still knows its job (output only the continuation, never repeat
 // the typed text) even when the profile prompt is replaced entirely.
 export const COMPLETION_CONSTRAINTS =
-    "Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
+    "Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing. Continue only the very last word or sentence at the end of the text; never complete or re-emit earlier sentences or list items.";
 
 export function buildSystemPromptFrom(
     fm: Record<string, unknown> | undefined,

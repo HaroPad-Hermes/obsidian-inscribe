@@ -23,7 +23,7 @@ function loadKey(): string | null {
 }
 
 const KEY = loadKey();
-const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
+const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing. Continue ONLY the very last word or sentence at the end of the text. Never complete or re-emit earlier sentences, list items, or text that already exists above.";
 
 async function chat(system: string, user: string, maxTokens: number, temperature: number): Promise<string> {
     const res = await fetch("https://api.deepseek.com/chat/completions", {
