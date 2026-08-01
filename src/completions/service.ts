@@ -172,7 +172,7 @@ export default class CompletionService {
         try {
             const result = await provider.generateOnce!(messages, {
                 model: options.model,
-                maxTokens: 1600,
+                maxTokens: 4000, // thinking-enabled rewrites need headroom (reasoning tokens count against the budget)
                 temperature: 0.5,
                 thinking: thinking ? "enabled" : "disabled",
             });
@@ -215,7 +215,7 @@ export default class CompletionService {
         try {
             const result = await provider.generateOnce!(messages, {
                 model: options.model,
-                maxTokens: 2000,
+                maxTokens: 4000, // thinking-enabled generation needs headroom (reasoning tokens count against the budget)
                 temperature: 0.7,
                 thinking: thinking ? "enabled" : "disabled",
             });
