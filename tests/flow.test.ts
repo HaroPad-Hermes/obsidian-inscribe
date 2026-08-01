@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom, WORD_VALIDITY_SYSTEM } from "../src/completions/flow";
+import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom, WORD_VALIDITY_SYSTEM, continuationWindow } from "../src/completions/flow";
 
 const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
 
