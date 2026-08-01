@@ -66,10 +66,11 @@ describe("computeGhost — AI1 classification handling", () => {
         ["um", "um dolor", "suffix matches → attaches"],
         ["ipsum", "um dolor", "full word derived to 'um' → attaches"],
         ["", "um dolor", "empty answer → no suffix → attaches"],
-        ["d", " um dolor", "suffix conflicts with continuation → AI2 wins, leading space"],
-        ["ol", " um dolor", "suffix conflicts → leading space"],
-        ["xyz", " um dolor", "garbage suffix conflicts → leading space"],
-        ["0", " um dolor", "stuck-like suffix conflicts → leading space"],
+        ["d", "um dolor", "echo/partial suffix + lowercase continuation → attaches (no false conflict)"],
+        ["ol", "um dolor", "partial suffix + lowercase continuation → attaches"],
+        ["xyz", "um dolor", "garbage suffix + lowercase continuation → attaches"],
+        ["0", "um dolor", "stuck-like suffix + lowercase continuation → attaches"],
+        ["m", "um dolor", "partial single-char suffix + lowercase continuation → attaches (the 'i psum' bug)"],
     ];
     for (const [answer, expected, why] of notFinishedVariants) {
         it(`treats ${JSON.stringify(answer)} as not-finished → ${expected} (${why})`, async () => {

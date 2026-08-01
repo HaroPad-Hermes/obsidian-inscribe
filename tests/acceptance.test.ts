@@ -32,18 +32,28 @@ describe("ghost shape per AI1 classification (code behavior)", () => {
         // judged in the battery, where AI1's real answer is visible.
         expect(await flow("Lorem ipsum do", "[Finished]", "lor sit")).toBe(" lor sit");
     });
-    it("complete word + wrongly not-finished → conflict check adds the space (AI2 wins)", async () => {
-        // AI1 says "em" for "Lorem" but the continuation starts a new word —
-        // the suffix doesn't match → leading space (fixes "Loremipsum").
-        expect(await flow("Lorem", "em", "ipsum dolor")).toBe(" ipsum dolor");
+    it("complete word + wrongly not-finished → lowercase continuation attaches (word completion wins)", async () => {
+        // AI1 says "em" for "Lorem" but the continuation is lowercase — the
+        // cross-check treats it as a word completion, not a new sentence.
+        expect(await flow("Lorem", "em", "ipsum dolor")).toBe("ipsum dolor");
     });
-    it("number prefix: AI1 suffix conflicts with a fresh continuation → leading space", async () => {
+    it("partial AI1 suffix ('m' for 'i') must not cause a leading space", async () => {
+        // Live failure: 'Lorem i' -> AI1 'm', continuation 'psum dolor...'
+        // The old cross-check added a space -> "i psum". Lowercase wins.
+        expect(await flow("Lorem i", "m", "psum dolor sit")).toBe("psum dolor sit");
+    });
+    it("partial AI1 suffix ('u' for 'ips') must not cause a leading space", async () => {
+        expect(await flow("Lorem ips", "u", "um dolor sit")).toBe("um dolor sit");
+    });
+    it("number prefix: AI1 suffix + capitalized continuation → leading space (AI2 wins)", async () => {
         // Live failure: "the year 202" -> AI1 "02", continuation "The world..."
-        // Without the cross-check the ghost glued: "202The".
+        // A NEW SENTENCE (capital) after a not-finished verdict gets the space.
         expect(await flow("the year 202", "02", "The world had changed")).toBe(" The world had changed");
     });
-    it("number prefix with lowercase new word → conflict still detected", async () => {
-        expect(await flow("the year 202", "02", "was a good year")).toBe(" was a good year");
+    it("number prefix with lowercase new word → attaches (accepted trade-off)", async () => {
+        // Rare: the continuation is a new word starting lowercase — the
+        // conservative cross-check attaches, matching AI1's verdict.
+        expect(await flow("the year 202", "02", "was a good year")).toBe("was a good year");
     });
     it("suffix matching the continuation → attaches (consistent verdict)", async () => {
         expect(await flow("Lorem ipsum d", "ol", "olor sit amet")).toBe("olor sit amet");

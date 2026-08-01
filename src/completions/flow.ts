@@ -138,17 +138,21 @@ export async function computeGhost(
     if (!cleaned || isStuckMarker(cleaned)) return null;
 
     if (!isFinished) {
-        // Cross-check AI1's not-finished verdict against AI2's continuation:
-        // if AI1 proposed a suffix but the continuation does NOT start with it,
-        // the model judged the word complete and started a new word — trust AI2
-        // and add the leading space (fixes glued "202The").
+        // Cross-check AI1's not-finished verdict against AI2's continuation.
+        // A leading space is added ONLY when the continuation starts a new
+        // sentence (uppercase/digit) — the model did NOT complete the word
+        // (fixes glued "202The"). Partial AI1 suffixes ('m' for "i") must not
+        // trigger a false conflict: lowercase continuations are word
+        // completions and attach directly ("psum..." -> "ipsum").
         const lastWord = text.split(/\s/).pop() || text;
         let suffix = checkResponse.trim();
         if (suffix.startsWith(lastWord) && suffix.length > lastWord.length) {
             suffix = suffix.slice(lastWord.length);
         }
         suffix = suffix.split(/\s/)[0] || '';
-        const attaches = !suffix || suffix === lastWord || cleaned.startsWith(suffix);
+        const suffixMatches = !!suffix && suffix !== lastWord && cleaned.startsWith(suffix);
+        const startsNewSentence = /^[A-ZÅÄÖ0-9]/.test(cleaned);
+        const attaches = suffixMatches || !startsNewSentence;
         return (attaches ? '' : ' ') + cleaned;
     }
 
