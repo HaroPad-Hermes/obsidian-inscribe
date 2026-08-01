@@ -92,7 +92,12 @@ export const diffSessionState = StateField.define<DiffSession | null>({
             if (!session) return Decoration.none;
             const decos = [
                 Decoration.widget({ widget: new DiffTextWidget(session.rewritten), side: -1 }).range(session.from),
-                Decoration.replace({ inclusive: false }).range(session.from, session.to),
+                // Replace decorations cannot be zero-length (CM6 throws
+                // "Invalid range"); generate sessions insert at the cursor
+                // (from === to) with nothing to hide.
+                ...(session.to > session.from
+                    ? [Decoration.replace({ inclusive: false }).range(session.from, session.to)]
+                    : []),
                 Decoration.widget({ widget: new DiffButtonsWidget(session), side: 1 }).range(session.to),
             ];
             // RangeSetBuilder requires ranges sorted by (from, startSide);
