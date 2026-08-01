@@ -5,23 +5,9 @@ import { Suggestion } from "src/extension";
 import { ProfileOptions, Settings } from "src/settings/settings";
 import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
+import { computeGhost, WORD_CHECK_SYSTEM } from "src/completions/flow";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
-
-// AI 1: classifies whether the last word is complete. The verdict decides the
-// ghost's leading space (code-side), never the model's raw output.
-const WORD_CHECK_SYSTEM =
-    'You check if the last word in a text fragment is complete.\n\n' +
-    'Respond with EXACTLY "[Finished]" (with brackets) if the last word is complete.\n' +
-    'Respond with ONLY the missing characters if the last word is incomplete.\n\n' +
-    'CRITICAL: No explanations. No punctuation. No extra text. No spaces. Just the answer.';
-
-const trimTrailing = (s: string): string => s.replace(/\s+$/, "");
-const trimLeading = (s: string): string => s.replace(/^\s+/, "");
-
-// Some models emit "0" (optionally with trailing punctuation) as a learned
-// stuck/refusal token. Treat it as an empty result — no ghost.
-const isStuckMarker = (s: string): boolean => /^0[\s.,;!?]*$/.test(s.trim());
 
 export default class CompletionService {
     private app: App;
@@ -105,15 +91,9 @@ export default class CompletionService {
             return;
         }
 
-        // ─── Plate-mode completion ───
-        // Spacing is decided by CODE, never by the model's output:
-        //  - text ends with a space        -> word boundary clear, single call
-        //  - AI 1 says [Finished]          -> word complete, ghost gets a leading
-        //                                     space (cursor has no trailing space)
-        //  - AI 1 says not finished        -> AI 2 completes the word naturally from
-        //                                     the trailing-space prompt; ghost attaches
-        //                                     with NO leading space ("d " -> "olor ...")
-        // The model's output is always trimmed on both sides before re-spacing.
+        // ─── Plate-mode completion (logic in flow.ts) ───
+        // Spacing is decided by CODE, never by the model's output. See
+        // src/completions/flow.ts for the exact rules and rationale.
         const initialPosition = editor.getCursor();
         const system = this.buildSystemPrompt(options);
         const text = prompt;
@@ -128,37 +108,16 @@ export default class CompletionService {
             return result;
         };
 
-        // Case 1: trailing space or empty text — word boundary is unambiguous.
-        if (text.endsWith(' ') || text.length === 0) {
-            const sentence = await generate(
-                [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text}` }],
-                { maxTokens: options.continuationTokens, temperature: options.temperature });
-            if (sentence === null) return;
-            const result = trimLeading(trimTrailing(sentence));
-            if (!result.trim() || isStuckMarker(result)) return;
-            yield { text: result };
-            return;
-        }
-
-        // Case 2: no trailing space — AI 1 classifies the last word.
-        const checkResult = await generate(
-            [{ role: 'system', content: WORD_CHECK_SYSTEM }, { role: 'user', content: `Text: ${text}\nIs the last word complete?` }],
-            { maxTokens: options.wordCheckTokens, temperature: 0.2 });
-        if (checkResult === null) return;
-
-        const checkResponse = checkResult.trim().replace(/^Option\s*[AB]:\s*/i, '');
-        const isFinished = checkResponse.toLowerCase().replace(/[^a-z]/g, '') === 'finished';
-
-        const sentence = await generate(
-            [{ role: 'system', content: system }, { role: 'user', content: `Continue writing. ${text} ` }],
-            { maxTokens: options.continuationTokens, temperature: options.temperature });
-        if (sentence === null) return;
-
-        const result = isFinished
-            ? ' ' + trimLeading(trimTrailing(sentence))
-            : trimLeading(trimTrailing(sentence));
-        if (!result.trim() || isStuckMarker(result)) return;
-        yield { text: result };
+        const ghost = await computeGhost(text, system, {
+            classifyWord: (t) => generate(
+                [{ role: 'system', content: WORD_CHECK_SYSTEM }, { role: 'user', content: `Text: ${t}\nIs the last word complete?` }],
+                { maxTokens: options.wordCheckTokens, temperature: 0.2 }),
+            continueText: (p) => generate(
+                [{ role: 'system', content: system }, { role: 'user', content: p }],
+                { maxTokens: options.continuationTokens, temperature: options.temperature }),
+        });
+        if (ghost === null) return;
+        yield { text: ghost };
     }
 
     private getPreCursorText(editor: Editor): string {

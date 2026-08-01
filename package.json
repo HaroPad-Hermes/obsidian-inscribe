@@ -6,6 +6,10 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:live": "vitest run tests/live.test.ts",
+		"battery": "vitest run tests/battery.test.ts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],
@@ -20,7 +24,8 @@
 		"esbuild": "0.25.1",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
-		"typescript": "6.0.2"
+		"typescript": "6.0.2",
+		"vitest": "^4.1.10"
 	},
 	"dependencies": {
 		"@google/genai": "^1.41.0",
