@@ -189,10 +189,10 @@ describe("computeGhost — edge inputs", () => {
 });
 
 describe("WORD_VALIDITY_SYSTEM — prompt sanity", () => {
-    it("demands a bare YES/NO answer", () => {
+    it("demands a bare YES/NO answer about a plausible continuation", () => {
         expect(WORD_VALIDITY_SYSTEM).toContain("YES");
         expect(WORD_VALIDITY_SYSTEM).toContain("NO");
-        expect(WORD_VALIDITY_SYSTEM).toContain("any language");
+        expect(WORD_VALIDITY_SYSTEM).toContain("plausible continuation");
     });
 });
 
