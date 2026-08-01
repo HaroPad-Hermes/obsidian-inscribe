@@ -10,6 +10,7 @@
 		"test:watch": "vitest",
 		"test:live": "vitest run tests/live.test.ts",
 		"battery": "vitest run tests/battery.test.ts",
+		"battery:parallel": "set BATTERY_PARALLEL=1&& vitest run tests/battery.test.ts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],

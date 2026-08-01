@@ -16,6 +16,25 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// Parallel mode: BATTERY_PARALLEL=1 npm run battery (or npm run battery:parallel)
+const PARALLEL = process.env.BATTERY_PARALLEL === "1";
+const CONCURRENCY = 5;
+
+// Run fn over items with at most `limit` in flight; results keep input order.
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const out = new Array<R>(items.length);
+    let i = 0;
+    await Promise.all(
+        Array.from({ length: Math.min(limit, items.length) }, async () => {
+            while (i < items.length) {
+                const idx = i++;
+                out[idx] = await fn(items[idx]);
+            }
+        })
+    );
+    return out;
+}
+
 const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
 
 function loadKey(): string | null {
@@ -94,21 +113,41 @@ const CASES: Case[] = [
     { typed: "The industrial revolution began in the late 18th century when mechanized textile production transformed manufacturing, and this period saw unprecedented changes in agriculture, transportation, and social structures across Europe. The introduction of the steam engine by James Watt in 1769 provided a reliable power source that", check: "long context, mid-word → completes 'could'; judge continuation coherence" },
 ];
 
+interface CaseResult {
+    ghost: string | null;
+    steps: string[];
+    doc: string;
+}
+
+async function runCase(c: Case): Promise<CaseResult> {
+    const ghost = await computeGhost(c.typed, SYS, {
+        continueText: async (p) => chat(SYS, p, 40, 0.5),
+        isPlausibleWord: async (text, candidate) => {
+            const r = (await chat(WORD_VALIDITY_SYSTEM, `Text: "${text}"\nIs "${candidate}" a plausible word to write here?`, 5, 0.1)).trim().toUpperCase();
+            return r.startsWith("YES");
+        },
+    }, { maxSentences: 1 });
+    const { steps, doc } = simulateTabs(c.typed, ghost ?? "");
+    return { ghost, steps, doc };
+}
+
 it("judgment battery (prints report — judge manually)", async () => {
     if (!KEY) {
         console.error("No DeepSeek key found (env DEEPSEEK_API_KEY or AppData\\Local\\hermes\\.env). Aborting.");
         return;
     }
-    console.log(`\nBattery against deepseek-v4-flash — ${CASES.length} cases + design experiment\n`);
-    for (const c of CASES) {
-        const ghost = await computeGhost(c.typed, SYS, {
-            continueText: async (p) => chat(SYS, p, 40, 0.5),
-            isPlausibleWord: async (text, candidate) => {
-                const r = (await chat(WORD_VALIDITY_SYSTEM, `Is "${candidate}" a plausible word?`, 5, 0.1)).trim().toUpperCase();
-                return r.startsWith("YES");
-            },
-        }, { maxSentences: 1 });
-        const { steps, doc } = simulateTabs(c.typed, ghost ?? "");
+    const started = Date.now();
+    console.log(`\nBattery against deepseek-v4-flash — ${CASES.length} cases (${PARALLEL ? `parallel ×${CONCURRENCY}` : "sequential"}) + design experiment\n`);
+    let results: CaseResult[];
+    if (PARALLEL) {
+        results = await mapLimit(CASES, CONCURRENCY, runCase);
+    } else {
+        results = [];
+        for (const c of CASES) results.push(await runCase(c));
+    }
+    for (let i = 0; i < CASES.length; i++) {
+        const c = CASES[i];
+        const { ghost, steps, doc } = results[i];
         console.log("─".repeat(72));
         console.log(`typed : ${JSON.stringify(c.typed)}`);
         console.log(`check : ${c.check}`);
@@ -116,6 +155,7 @@ it("judgment battery (prints report — judge manually)", async () => {
         console.log(`tabs  : ${JSON.stringify(steps)}`);
         console.log(`doc   : ${JSON.stringify(doc)}`);
     }
+    console.log(`\nElapsed: ${((Date.now() - started) / 1000).toFixed(1)}s (${PARALLEL ? "parallel" : "sequential"})`);
 
     // Design experiment: does the model emit its own leading space when given
     // no trailing space? Informs whether AI1's [Finished] verdict could be
