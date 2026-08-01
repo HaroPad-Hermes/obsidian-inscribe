@@ -225,3 +225,40 @@ describe("computeGhost — markdown stripping", () => {
         expect(stripMarkdown("$\\frac{1}{2}$ stays")).toBe("$\\frac{1}{2}$ stays");
     });
 });
+
+describe("continuationWindow", () => {
+    it("keeps only the last two lines", () => {
+        expect(continuationWindow("a
+b
+c
+d")).toBe("c
+d");
+    });
+
+    it("keeps everything when there are two or fewer lines", () => {
+        expect(continuationWindow("only line")).toBe("only line");
+        expect(continuationWindow("a
+b")).toBe("a
+b");
+    });
+
+    it("caps long lines from the END (nearest the cursor)", () => {
+        const long = "x".repeat(900);
+        const out = continuationWindow(long, 2, 600);
+        expect(out.length).toBe(600);
+        expect(out).toBe("x".repeat(600));
+    });
+
+    it("caps only the windowed tail, not the whole document", () => {
+        const first = "y".repeat(800);
+        const last = "z".repeat(700);
+        const out = continuationWindow(`${first}
+${last}`, 2, 600);
+        expect(out).toBe(`${"y".repeat(600)}
+${"z".repeat(600)}`);
+    });
+
+    it("handles empty text", () => {
+        expect(continuationWindow("")).toBe("");
+    });
+});

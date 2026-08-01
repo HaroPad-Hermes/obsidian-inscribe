@@ -112,6 +112,20 @@ export interface GhostOptions {
 //  - AI 1 not finished                     -> AI 2 completes the word naturally
 //                                             from the trailing-space prompt;
 //                                             ghost attaches with NO leading space
+// The continuation only sees a window around the cursor: the last two lines,
+// each capped at 600 chars (kept from the END — nearest the cursor). Full-
+// document context confuses the model when earlier lines are unfinished: it
+// completes the first dangling sentence (or re-emits the list) instead of the
+// cursor word. This is plate's N-1, N design. The plausible-word check still
+// receives the FULL text — only the continuation prompt is windowed.
+export function continuationWindow(text: string, maxLines = 2, maxLineChars = 600): string {
+    return text
+        .split("\n")
+        .slice(-maxLines)
+        .map((line) => (line.length > maxLineChars ? line.slice(-maxLineChars) : line))
+        .join("\n");
+}
+
 export async function computeGhost(
     text: string,
     systemPrompt: string,
@@ -123,7 +137,7 @@ export async function computeGhost(
 
     // Case 1: trailing space or empty text — word boundary is unambiguous.
     if (text.endsWith(' ') || text.length === 0) {
-        const sentence = await cb.continueText(`Continue writing. ${text}`);
+        const sentence = await cb.continueText(`Continue writing. ${continuationWindow(text)}`);
         if (sentence === null) return null;
         const result = clean(sentence);
         if (!result || isStuckMarker(result)) return null;
@@ -135,7 +149,7 @@ export async function computeGhost(
     // continuation as evidence ("i"+"psum" = "ipsum" -> attach; "Lorem"+
     // "ipsum" = "Loremipsum" -> leading space). This replaces AI 1: its
     // context-free verdict was unreliable for word-prefixes ('i', 'do').
-    const sentence = await cb.continueText(`Continue writing. ${text} `);
+    const sentence = await cb.continueText(`Continue writing. ${continuationWindow(text)} `);
     if (sentence === null) return null;
 
     const cleaned = clean(sentence);
