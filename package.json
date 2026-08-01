@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"deploy": "npm run build && node deploy.mjs",
 		"test": "vitest run",
 		"test:fast": "vitest run --exclude tests/live.test.ts --exclude tests/battery.test.ts",
 		"test:watch": "vitest",
