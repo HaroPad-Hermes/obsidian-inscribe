@@ -7,6 +7,8 @@ export default defineConfig({
     },
     resolve: {
         alias: {
+            // Mirror tsconfig paths: the plugin imports via "src/...".
+            src: path.resolve(__dirname, "src"),
             // Tests never touch the real Obsidian runtime; stub the module so
             // DOM-dependent extensions can still be imported for pure-logic tests.
             obsidian: path.resolve(__dirname, "tests/stubs/obsidian.ts"),
