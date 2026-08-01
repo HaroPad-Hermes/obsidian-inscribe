@@ -10,19 +10,26 @@ export interface SelectionMenuRunner {
     (instruction: string, thinking: boolean): Promise<boolean>;
 }
 
-// Pure positioning: the menu's left corner is pinned to the leftmost point of
-// the text field (contentLeft + 8), vertically below the selection's bottom
-// edge, flipping above when it would overflow the viewport. Unit-testable.
+// Pure positioning: the menu's left corner sits at the selection's leftmost
+// edge (already resolved by the caller), vertically below the selection's
+// bottom edge, flipping above when it would overflow the viewport.
+// Unit-testable.
 export function computeMenuPosition(
-    anchor: { top: number; bottom: number },
+    anchor: { left: number; top: number; bottom: number },
     menu: { width: number; height: number },
-    viewport: { width: number; height: number },
-    contentLeft: number
+    viewport: { width: number; height: number }
 ): { left: number; top: number } {
-    const left = contentLeft + 8;
+    const left = Math.max(8, anchor.left);
     const below = anchor.bottom + 6;
     const top = below + menu.height > viewport.height - 8 ? Math.max(8, anchor.top - menu.height - 6) : below;
     return { left, top };
+}
+
+// Resolve the menu's horizontal anchor: single-line selections hug the
+// leftmost highlighted character; multi-line selections (containing a
+// newline) pin to the text field's left edge. Unit-testable.
+export function selectionMenuLeft(fromLeft: number, contentLeft: number, selectionText: string): number {
+    return selectionText.includes("\n") ? contentLeft + 8 : Math.max(8, fromLeft);
 }
 
 const PRESET_ICONS: Record<string, string> = {
@@ -116,23 +123,31 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
                     return;
                 }
                 this.show({
+                    // Single-line selection: hug the leftmost highlighted
+                    // character. Multi-line selection: pin to the text field's
+                    // left edge — hugging a character looks awkward across
+                    // wrapped lines/paragraphs.
+                    left: selectionMenuLeft(
+                        from.left,
+                        this.view.contentDOM.getBoundingClientRect().left,
+                        this.view.state.sliceDoc(sel.from, sel.to)
+                    ),
                     top: Math.min(from.top, to.top),
                     bottom: Math.max(from.bottom, to.bottom),
                 });
             }
 
-            private show(anchor: { top: number; bottom: number }) {
+            private show(anchor: { left: number; top: number; bottom: number }) {
                 if (!this.menu) this.build();
                 const menu = this.menu!;
                 menu.style.display = "flex";
-                const contentLeft = this.view.contentDOM.getBoundingClientRect().left;
                 const { left, top } = computeMenuPosition(anchor, {
                     width: menu.offsetWidth || 260,
                     height: menu.offsetHeight || 34,
                 }, {
                     width: window.innerWidth,
                     height: window.innerHeight,
-                }, contentLeft);
+                });
                 menu.style.left = `${left}px`;
                 menu.style.top = `${top}px`;
             }
