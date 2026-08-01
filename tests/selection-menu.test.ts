@@ -10,7 +10,7 @@ describe("selectionMenuLeft", () => {
     });
 
     it("pins to the text field's left edge for multi-line selections", () => {
-        expect(selectionMenuLeft(200, 300, true)).toBe(308); // contentLeft + 8
+        expect(selectionMenuLeft(200, 300, true)).toBe(300); // contentLeft, flush
     });
 
     it("clamps single-line anchors to 8px near the left border", () => {

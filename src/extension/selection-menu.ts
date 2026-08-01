@@ -30,7 +30,7 @@ export function computeMenuPosition(
 // lines — hard newline OR soft wrap) pin to the text field's left edge.
 // Unit-testable.
 export function selectionMenuLeft(fromLeft: number, contentLeft: number, multiLine: boolean): number {
-    return multiLine ? contentLeft + 8 : Math.max(8, fromLeft);
+    return multiLine ? contentLeft : Math.max(8, fromLeft);
 }
 
 const PRESET_ICONS: Record<string, string> = {
