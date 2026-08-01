@@ -10,15 +10,15 @@ export interface SelectionMenuRunner {
     (instruction: string, thinking: boolean): Promise<boolean>;
 }
 
-// Pure positioning: center the menu horizontally on the selection's midpoint,
-// below the selection's bottom edge, flipping above when it would overflow the
-// viewport. Unit-testable.
+// Pure positioning: the menu's left corner sits at the leftmost edge of the
+// selected text, vertically below the selection's bottom edge, flipping above
+// when it would overflow the viewport. Unit-testable.
 export function computeMenuPosition(
-    anchor: { midX: number; top: number; bottom: number },
+    anchor: { left: number; top: number; bottom: number },
     menu: { width: number; height: number },
     viewport: { width: number; height: number }
 ): { left: number; top: number } {
-    const left = Math.max(8, Math.min(anchor.midX - menu.width / 2, viewport.width - menu.width - 8));
+    const left = Math.max(8, anchor.left);
     const below = anchor.bottom + 6;
     const top = below + menu.height > viewport.height - 8 ? Math.max(8, anchor.top - menu.height - 6) : below;
     return { left, top };
@@ -115,14 +115,15 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
                     return;
                 }
                 this.show({
-                    // Anchor on the middle of the selection, not its start.
-                    midX: (from.left + to.right) / 2,
+                    // Left corner at the leftmost edge of the selected text
+                    // (sel.from is always the smaller position).
+                    left: from.left,
                     top: Math.min(from.top, to.top),
                     bottom: Math.max(from.bottom, to.bottom),
                 });
             }
 
-            private show(anchor: { midX: number; top: number; bottom: number }) {
+            private show(anchor: { left: number; top: number; bottom: number }) {
                 if (!this.menu) this.build();
                 const menu = this.menu!;
                 menu.style.display = "flex";
