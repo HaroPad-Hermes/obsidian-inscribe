@@ -226,6 +226,37 @@ describe("computeGhost — markdown stripping", () => {
     });
 });
 
+
+describe("computeGhost raw continuation argument (FIM)", () => {
+    it("passes the windowed raw prefix as the second argument", async () => {
+        let receivedPrompt = "";
+        let receivedRaw: string | undefined;
+        const ghost = await computeGhost("a
+long text with an unfinished wor", SYS, {
+            continueText: async (prompt, raw) => {
+                receivedPrompt = prompt;
+                receivedRaw = raw;
+                return "d";
+            },
+            isPlausibleWord: async () => true,
+        }, { maxSentences: 1 });
+        expect(ghost).toBe("d");
+        expect(receivedPrompt).toBe("Continue writing. a
+long text with an unfinished wor ");
+        expect(receivedRaw).toBe("a
+long text with an unfinished wor");
+    });
+
+    it("case 1 (trailing space) passes the raw windowed prefix too", async () => {
+        let receivedRaw: string | undefined;
+        await computeGhost("finished word ", SYS, {
+            continueText: async (_prompt, raw) => { receivedRaw = raw; return "next"; },
+            isPlausibleWord: async () => true,
+        }, { maxSentences: 1 });
+        expect(receivedRaw).toBe("finished word ");
+    });
+});
+
 describe("continuationWindow", () => {
     it("keeps only the last two lines", () => {
         expect(continuationWindow("a" + "\n" + "b" + "\n" + "c" + "\n" + "d")).toBe("c" + "\n" + "d");

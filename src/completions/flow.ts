@@ -88,9 +88,11 @@ export function stripMarkdown(s: string): string {
 }
 
 export interface GhostCallbacks {
-    // AI 2: receives the full continuation prompt, returns the raw
+    // AI 2: receives the full continuation prompt plus the raw windowed prefix
+    // (no "Continue writing." instruction, no artificial trailing space) so a
+    // FIM-capable provider can call its suffix endpoint. Returns the raw
     // continuation text (or null if aborted / cursor moved).
-    continueText: (prompt: string) => Promise<string | null>;
+    continueText: (prompt: string, raw?: string) => Promise<string | null>;
     // The spacing arbiter: is `candidate` (typed last word + continuation's
     // first token) a plausible continuation of `text`? YES -> the continuation
     // completes the word (attach); NO -> it starts a new word (space).
@@ -137,7 +139,8 @@ export async function computeGhost(
 
     // Case 1: trailing space or empty text — word boundary is unambiguous.
     if (text.endsWith(' ') || text.length === 0) {
-        const sentence = await cb.continueText(`Continue writing. ${continuationWindow(text)}`);
+        const windowed = continuationWindow(text);
+        const sentence = await cb.continueText(`Continue writing. ${windowed}`, windowed);
         if (sentence === null) return null;
         const result = clean(sentence);
         if (!result || isStuckMarker(result)) return null;
@@ -149,7 +152,8 @@ export async function computeGhost(
     // continuation as evidence ("i"+"psum" = "ipsum" -> attach; "Lorem"+
     // "ipsum" = "Loremipsum" -> leading space). This replaces AI 1: its
     // context-free verdict was unreliable for word-prefixes ('i', 'do').
-    const sentence = await cb.continueText(`Continue writing. ${continuationWindow(text)} `);
+    const windowed = continuationWindow(text);
+    const sentence = await cb.continueText(`Continue writing. ${windowed} `, windowed);
     if (sentence === null) return null;
 
     const cleaned = clean(sentence);

@@ -32,6 +32,10 @@ export interface Provider {
     // Optional non-streaming single call — used by the two-prompt (plate-mode) flow.
     // Providers without it fall back to the streaming path.
     generateOnce?: (messages: ChatMessage[], opts: GenerateOnceOptions) => Promise<string>;
+    // FIM (fill-in-the-middle): raw completion with a suffix anchor. Providers
+    // that expose a suffix-FIM endpoint (e.g. DeepSeek /beta/completions) use
+    // this for continuations; others fall back to the chat path.
+    generateFimOnce?: (prompt: string, suffix: string, opts: GenerateOnceOptions) => Promise<string>;
     abort: () => Promise<void>;
     fetchModels(): Promise<string[]> | string[];
     connectionTest(): Promise<boolean>;

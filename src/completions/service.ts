@@ -118,10 +118,43 @@ export default class CompletionService {
             return result;
         };
 
+        // Text after the cursor, capped — the FIM suffix anchor.
+        const suffixText = editor
+            .getValue()
+            .slice(editor.posToOffset(editor.getCursor()))
+            .slice(0, 4000);
+
         const ghost = await computeGhost(text, system, {
-            continueText: (p) => generate(
-                [{ role: 'system', content: system }, { role: 'user', content: p }],
-                { maxTokens: options.continuationTokens, temperature: options.temperature }),
+            continueText: async (p, raw) => {
+                // FIM path: when the provider exposes a suffix endpoint and
+                // there IS text after the cursor, the raw prefix + suffix
+                // anchor the position structurally (no "which dangling
+                // sentence?" ambiguity). Chat path otherwise.
+                let fimResult: string | null = null;
+                let fimTried = false;
+                if (raw !== undefined && suffixText && provider.generateFimOnce) {
+                    fimTried = true;
+                    try {
+                        fimResult = await provider.generateFimOnce!(raw, suffixText, {
+                            model: options.model,
+                            maxTokens: options.continuationTokens,
+                            temperature: options.temperature,
+                        });
+                    } catch (error) {
+                        console.error("Inscribe: FIM completion failed — falling back to chat path", error);
+                    }
+                }
+                if (fimTried && fimResult !== null) {
+                    if (moved()) {
+                        await provider.abort();
+                        return null;
+                    }
+                    return fimResult;
+                }
+                return generate(
+                    [{ role: 'system', content: system }, { role: 'user', content: p }],
+                    { maxTokens: options.continuationTokens, temperature: options.temperature });
+            },
             isPlausibleWord: async (text, candidate) => {
                 const r = await generate(
                     [{ role: 'system', content: WORD_VALIDITY_SYSTEM }, { role: 'user', content: `Text: "${text}"\nIs "${candidate}" a plausible word to write here?` }],
