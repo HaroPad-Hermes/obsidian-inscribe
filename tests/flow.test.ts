@@ -228,18 +228,12 @@ describe("computeGhost — markdown stripping", () => {
 
 describe("continuationWindow", () => {
     it("keeps only the last two lines", () => {
-        expect(continuationWindow("a
-b
-c
-d")).toBe("c
-d");
+        expect(continuationWindow("a" + "\n" + "b" + "\n" + "c" + "\n" + "d")).toBe("c" + "\n" + "d");
     });
 
     it("keeps everything when there are two or fewer lines", () => {
         expect(continuationWindow("only line")).toBe("only line");
-        expect(continuationWindow("a
-b")).toBe("a
-b");
+        expect(continuationWindow("a" + "\n" + "b")).toBe("a" + "\n" + "b");
     });
 
     it("caps long lines from the END (nearest the cursor)", () => {
