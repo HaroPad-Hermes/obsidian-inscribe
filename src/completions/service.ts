@@ -19,6 +19,10 @@ const WORD_CHECK_SYSTEM =
 const trimTrailing = (s: string): string => s.replace(/\s+$/, "");
 const trimLeading = (s: string): string => s.replace(/^\s+/, "");
 
+// Some models emit "0" (optionally with trailing punctuation) as a learned
+// stuck/refusal token. Treat it as an empty result — no ghost.
+const isStuckMarker = (s: string): boolean => /^0[\s.,;!?]*$/.test(s.trim());
+
 export default class CompletionService {
     private app: App;
     private settings: Settings;
@@ -131,7 +135,7 @@ export default class CompletionService {
                 { maxTokens: options.continuationTokens, temperature: options.temperature });
             if (sentence === null) return;
             const result = trimLeading(trimTrailing(sentence));
-            if (!result.trim()) return;
+            if (!result.trim() || isStuckMarker(result)) return;
             yield { text: result };
             return;
         }
@@ -153,7 +157,7 @@ export default class CompletionService {
         const result = isFinished
             ? ' ' + trimLeading(trimTrailing(sentence))
             : trimLeading(trimTrailing(sentence));
-        if (!result.trim()) return;
+        if (!result.trim() || isStuckMarker(result)) return;
         yield { text: result };
     }
 
