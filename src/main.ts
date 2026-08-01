@@ -78,7 +78,8 @@ export default class Inscribe extends Plugin {
 				cm.dispatch({ effects: setDiffEffect.of(session) });
 				return true;
 			},
-			() => this.settings.suggestionControl.selectionMenuPlacement
+			() => this.settings.suggestionControl.selectionMenuPlacement,
+			() => this.settings.suggestionControl.selectionMenuSide
 		);
 		this.registerEditorExtension([extension, diffSessionState, selectionMenu]);
 	}

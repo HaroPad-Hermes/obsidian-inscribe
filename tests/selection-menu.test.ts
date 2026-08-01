@@ -33,18 +33,28 @@ describe("resolveMenuLeft", () => {
 });
 
 describe("computeMenuPosition", () => {
-    it("places the menu's left corner at the resolved anchor", () => {
-        const { left } = computeMenuPosition({ left: 200, top: 300, bottom: 320 }, menu, viewport);
-        expect(left).toBe(200);
-    });
-
-    it("places the menu below the selection's bottom edge", () => {
-        const { top } = computeMenuPosition({ left: 200, top: 300, bottom: 320 }, menu, viewport);
+    it("below: places the menu below the selection's bottom edge", () => {
+        const { top } = computeMenuPosition({ left: 200, top: 300, bottom: 320 }, menu, viewport, "below");
         expect(top).toBe(326); // bottom + 6
     });
 
-    it("flips above the selection when the menu would overflow the bottom", () => {
-        const { top } = computeMenuPosition({ left: 200, top: 1050, bottom: 1070 }, menu, viewport);
+    it("below: flips above the selection when the menu would overflow the bottom", () => {
+        const { top } = computeMenuPosition({ left: 200, top: 1050, bottom: 1070 }, menu, viewport, "below");
         expect(top).toBe(1010); // anchor.top - menu.height - 6
+    });
+
+    it("above: places the menu above the selection's top edge", () => {
+        const { top } = computeMenuPosition({ left: 200, top: 300, bottom: 320 }, menu, viewport, "above");
+        expect(top).toBe(260); // anchor.top - menu.height - 6
+    });
+
+    it("above: flips below when the menu would overflow the top", () => {
+        const { top } = computeMenuPosition({ left: 200, top: 20, bottom: 40 }, menu, viewport, "above");
+        expect(top).toBe(46); // bottom + 6
+    });
+
+    it("places the menu's left corner at the resolved anchor", () => {
+        const { left } = computeMenuPosition({ left: 200, top: 300, bottom: 320 }, menu, viewport, "below");
+        expect(left).toBe(200);
     });
 });

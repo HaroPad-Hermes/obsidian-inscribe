@@ -136,6 +136,20 @@ class SuggestionControlSection {
                     });
             });
 
+        new Setting(this.container)
+            .setName("Selection menu side")
+            .setDesc("Below: under the selection (flips above near the window bottom). Above: over the selection (flips below near the top).")
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOption("below", "Below")
+                    .addOption("above", "Above")
+                    .setValue(this.plugin.settings.suggestionControl.selectionMenuSide)
+                    .onChange(async (value) => {
+                        this.plugin.settings.suggestionControl.selectionMenuSide = value as "below" | "above";
+                        await this.plugin.saveSettings();
+                    });
+            });
+
         // Plate Mode (one-click plate-editor-style setup)
         new Setting(this.container)
             .setName("Plate mode")

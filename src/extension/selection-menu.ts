@@ -5,7 +5,7 @@
 import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { setIcon, setTooltip } from "obsidian";
 import { REWRITE_PRESETS } from "src/completions/rewrite";
-import type { SelectionMenuPlacement } from "src/settings/settings";
+import type { SelectionMenuPlacement, SelectionMenuSide } from "src/settings/settings";
 
 export interface SelectionMenuRunner {
     (instruction: string, thinking: boolean): Promise<boolean>;
@@ -37,15 +37,24 @@ export function resolveMenuLeft(
     }
 }
 
-// Pure positioning: vertical placement below the selection's bottom edge,
-// flipping above when it would overflow the viewport; the left corner is
-// already resolved by the caller. Unit-testable.
+// Pure positioning: vertical placement on the chosen side of the selection
+// ("below" the bottom edge, "above" the top edge), flipping to the other side
+// when the menu would overflow the viewport; the left corner is already
+// resolved by the caller. Unit-testable.
 export function computeMenuPosition(
     anchor: { left: number; top: number; bottom: number },
     menu: { width: number; height: number },
-    viewport: { width: number; height: number }
+    viewport: { width: number; height: number },
+    side: SelectionMenuSide
 ): { left: number; top: number } {
     const left = Math.max(8, anchor.left);
+    if (side === "above") {
+        const above = anchor.top - menu.height - 6;
+        if (above >= 8) return { left, top: above };
+        // Would overflow the top — fall back below.
+        const below = Math.min(anchor.bottom + 6, viewport.height - menu.height - 8);
+        return { left, top: Math.max(8, below) };
+    }
     const below = anchor.bottom + 6;
     const top = below + menu.height > viewport.height - 8 ? Math.max(8, anchor.top - menu.height - 6) : below;
     return { left, top };
@@ -60,7 +69,11 @@ const PRESET_ICONS: Record<string, string> = {
     latex: "sigma",
 };
 
-export function selectionMenuPlugin(run: SelectionMenuRunner, getPlacement: () => SelectionMenuPlacement) {
+export function selectionMenuPlugin(
+    run: SelectionMenuRunner,
+    getPlacement: () => SelectionMenuPlacement,
+    getSide: () => SelectionMenuSide
+) {
     return ViewPlugin.fromClass(
         class {
             view: EditorView;
@@ -180,7 +193,8 @@ export function selectionMenuPlugin(run: SelectionMenuRunner, getPlacement: () =
                 const { left: finalLeft, top } = computeMenuPosition(
                     { left, top: anchor.top, bottom: anchor.bottom },
                     { width, height: menu.offsetHeight || 34 },
-                    { width: window.innerWidth, height: window.innerHeight }
+                    { width: window.innerWidth, height: window.innerHeight },
+                    getSide()
                 );
                 menu.style.left = `${finalLeft}px`;
                 menu.style.top = `${top}px`;

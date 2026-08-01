@@ -32,6 +32,7 @@ export type Profiles = Record<ProfileId, Profile>
 export type Path = string;
 export type PathConfig = { profile: ProfileId, enabled: boolean };
 export type SelectionMenuPlacement = "smart" | "centered" | "first";
+export type SelectionMenuSide = "below" | "above";
 
 export type SuggestionControl = {
     // One-click plate-editor-style setup (Tab dual-role + word split)
@@ -44,6 +45,9 @@ export type SuggestionControl = {
     // field edge on multi-line), "centered" (selection midpoint), "first"
     // (always the first highlighted character).
     selectionMenuPlacement: SelectionMenuPlacement,
+    // Selection quick-menu side: "below" (under the selection, flips above on
+    // overflow) or "above" (over the selection, flips below on overflow).
+    selectionMenuSide: SelectionMenuSide,
     outputLimit: {
         enabled: boolean,
         sentences: number,
@@ -87,6 +91,7 @@ export const DEFAULT_SETTINGS: Settings = {
         splitStrategy: "sentence",
         manualActivationKey: "",
         selectionMenuPlacement: "smart",
+        selectionMenuSide: "below",
         outputLimit: {
             enabled: true,
             sentences: 1,
