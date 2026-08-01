@@ -5,15 +5,41 @@
 import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { setIcon, setTooltip } from "obsidian";
 import { REWRITE_PRESETS } from "src/completions/rewrite";
+import type { SelectionMenuPlacement } from "src/settings/settings";
 
 export interface SelectionMenuRunner {
     (instruction: string, thinking: boolean): Promise<boolean>;
 }
 
-// Pure positioning: the menu's left corner sits at the selection's leftmost
-// edge (already resolved by the caller), vertically below the selection's
-// bottom edge, flipping above when it would overflow the viewport.
-// Unit-testable.
+// Resolve the menu's horizontal anchor:
+//  - "smart":    single-line selections hug the leftmost highlighted
+//                character; multi-line selections (different visual lines —
+//                hard newline OR soft wrap) pin to the text field's left edge
+//  - "centered": centered on the selection's midpoint
+//  - "first":    always the leftmost highlighted character
+export function resolveMenuLeft(
+    mode: SelectionMenuPlacement,
+    fromLeft: number,
+    contentLeft: number,
+    multiLine: boolean,
+    midX: number,
+    menuWidth: number,
+    viewportWidth: number
+): number {
+    switch (mode) {
+        case "centered":
+            return Math.max(8, Math.min(midX - menuWidth / 2, viewportWidth - menuWidth - 8));
+        case "first":
+            return Math.max(8, fromLeft);
+        case "smart":
+        default:
+            return multiLine ? contentLeft : Math.max(8, fromLeft);
+    }
+}
+
+// Pure positioning: vertical placement below the selection's bottom edge,
+// flipping above when it would overflow the viewport; the left corner is
+// already resolved by the caller. Unit-testable.
 export function computeMenuPosition(
     anchor: { left: number; top: number; bottom: number },
     menu: { width: number; height: number },
@@ -25,14 +51,6 @@ export function computeMenuPosition(
     return { left, top };
 }
 
-// Resolve the menu's horizontal anchor: single-line selections hug the
-// leftmost highlighted character; multi-line selections (different visual
-// lines — hard newline OR soft wrap) pin to the text field's left edge.
-// Unit-testable.
-export function selectionMenuLeft(fromLeft: number, contentLeft: number, multiLine: boolean): number {
-    return multiLine ? contentLeft : Math.max(8, fromLeft);
-}
-
 const PRESET_ICONS: Record<string, string> = {
     rephrase: "wand-2",
     shorten: "minimize-2",
@@ -42,7 +60,7 @@ const PRESET_ICONS: Record<string, string> = {
     latex: "sigma",
 };
 
-export function selectionMenuPlugin(run: SelectionMenuRunner) {
+export function selectionMenuPlugin(run: SelectionMenuRunner, getPlacement: () => SelectionMenuPlacement) {
     return ViewPlugin.fromClass(
         class {
             view: EditorView;
@@ -125,32 +143,46 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
                 }
                 // Multi-line detection via geometry: start and end on
                 // different visual lines (hard newline OR soft wrap) have
-                // different top coordinates — sliceDoc's "\n" check misses
+                // different top coordinates — a sliceDoc "\n" check would miss
                 // wrapped paragraphs.
                 const multiLine = Math.abs(to.top - from.top) > 1;
                 this.show({
-                    left: selectionMenuLeft(
-                        from.left,
-                        this.view.contentDOM.getBoundingClientRect().left,
-                        multiLine
-                    ),
+                    fromLeft: from.left,
+                    contentLeft: this.view.contentDOM.getBoundingClientRect().left,
+                    multiLine,
+                    midX: (from.left + to.right) / 2,
                     top: Math.min(from.top, to.top),
                     bottom: Math.max(from.bottom, to.bottom),
                 });
             }
 
-            private show(anchor: { left: number; top: number; bottom: number }) {
+            private show(anchor: {
+                fromLeft: number;
+                contentLeft: number;
+                multiLine: boolean;
+                midX: number;
+                top: number;
+                bottom: number;
+            }) {
                 if (!this.menu) this.build();
                 const menu = this.menu!;
                 menu.style.display = "flex";
-                const { left, top } = computeMenuPosition(anchor, {
-                    width: menu.offsetWidth || 260,
-                    height: menu.offsetHeight || 34,
-                }, {
-                    width: window.innerWidth,
-                    height: window.innerHeight,
-                });
-                menu.style.left = `${left}px`;
+                const width = menu.offsetWidth || 260;
+                const left = resolveMenuLeft(
+                    getPlacement(),
+                    anchor.fromLeft,
+                    anchor.contentLeft,
+                    anchor.multiLine,
+                    anchor.midX,
+                    width,
+                    window.innerWidth
+                );
+                const { left: finalLeft, top } = computeMenuPosition(
+                    { left, top: anchor.top, bottom: anchor.bottom },
+                    { width, height: menu.offsetHeight || 34 },
+                    { width: window.innerWidth, height: window.innerHeight }
+                );
+                menu.style.left = `${finalLeft}px`;
                 menu.style.top = `${top}px`;
             }
 

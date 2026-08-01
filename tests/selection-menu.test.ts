@@ -1,20 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { computeMenuPosition, selectionMenuLeft } from "../src/extension/selection-menu";
+import { computeMenuPosition, resolveMenuLeft } from "../src/extension/selection-menu";
 
 const viewport = { width: 1920, height: 1080 };
 const menu = { width: 260, height: 34 };
 
-describe("selectionMenuLeft", () => {
-    it("hugs the leftmost highlighted character for single-line selections", () => {
-        expect(selectionMenuLeft(200, 300, false)).toBe(200);
+describe("resolveMenuLeft", () => {
+    it("smart: hugs the leftmost highlighted character on one line", () => {
+        expect(resolveMenuLeft("smart", 200, 300, false, 500, 260, 1920)).toBe(200);
     });
 
-    it("pins to the text field's left edge for multi-line selections", () => {
-        expect(selectionMenuLeft(200, 300, true)).toBe(300); // contentLeft, flush
+    it("smart: pins to the text field's left edge on multi-line selections", () => {
+        expect(resolveMenuLeft("smart", 200, 300, true, 500, 260, 1920)).toBe(300);
     });
 
-    it("clamps single-line anchors to 8px near the left border", () => {
-        expect(selectionMenuLeft(-40, 300, false)).toBe(8);
+    it("first: always hugs the leftmost highlighted character, even multi-line", () => {
+        expect(resolveMenuLeft("first", 200, 300, true, 500, 260, 1920)).toBe(200);
+    });
+
+    it("centered: centers on the selection midpoint", () => {
+        // midX 500, width 260 -> 500 - 130 = 370
+        expect(resolveMenuLeft("centered", 200, 300, false, 500, 260, 1920)).toBe(370);
+    });
+
+    it("centered: clamps near the left border", () => {
+        expect(resolveMenuLeft("centered", 200, 300, false, 40, 260, 1920)).toBe(8);
+    });
+
+    it("centered: clamps near the right border", () => {
+        // 1900 - 130 = 1770 -> clamp to 1920 - 260 - 8 = 1652
+        expect(resolveMenuLeft("centered", 200, 300, false, 1900, 260, 1920)).toBe(1652);
     });
 });
 

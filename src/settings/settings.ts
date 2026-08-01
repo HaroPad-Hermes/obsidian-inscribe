@@ -31,6 +31,8 @@ export type ProfileId = string;
 export type Profiles = Record<ProfileId, Profile>
 export type Path = string;
 export type PathConfig = { profile: ProfileId, enabled: boolean };
+export type SelectionMenuPlacement = "smart" | "centered" | "first";
+
 export type SuggestionControl = {
     // One-click plate-editor-style setup (Tab dual-role + word split)
     plateMode: boolean,
@@ -38,6 +40,10 @@ export type SuggestionControl = {
     manualActivationKey?: string,
     splitStrategy: SplitStrategy,
     delayMs: number,
+    // Selection quick-menu placement: "smart" (first char on one line, text
+    // field edge on multi-line), "centered" (selection midpoint), "first"
+    // (always the first highlighted character).
+    selectionMenuPlacement: SelectionMenuPlacement,
     outputLimit: {
         enabled: boolean,
         sentences: number,
@@ -80,6 +86,7 @@ export const DEFAULT_SETTINGS: Settings = {
         acceptanceHotkey: "Tab",
         splitStrategy: "sentence",
         manualActivationKey: "",
+        selectionMenuPlacement: "smart",
         outputLimit: {
             enabled: true,
             sentences: 1,

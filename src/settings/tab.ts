@@ -120,6 +120,22 @@ class SuggestionControlSection {
             .setName("Suggestion control")
             .setDesc("Configure how completions are triggered and accepted");
 
+        // Selection menu placement (live — no restart needed)
+        new Setting(this.container)
+            .setName("Selection menu placement")
+            .setDesc("Where the edit-selection bar anchors: Smart (first highlighted character on one line, text field edge on multi-line selections), Centered (midpoint of the selection), or First character (always the leftmost highlighted character).")
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOption("smart", "Smart (current)")
+                    .addOption("centered", "Centered")
+                    .addOption("first", "First character")
+                    .setValue(this.plugin.settings.suggestionControl.selectionMenuPlacement)
+                    .onChange(async (value) => {
+                        this.plugin.settings.suggestionControl.selectionMenuPlacement = value as "smart" | "centered" | "first";
+                        await this.plugin.saveSettings();
+                    });
+            });
+
         // Plate Mode (one-click plate-editor-style setup)
         new Setting(this.container)
             .setName("Plate mode")

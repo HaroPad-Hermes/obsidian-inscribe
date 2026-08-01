@@ -67,16 +67,19 @@ export default class Inscribe extends Plugin {
 			acceptanceHotkey: this.settings.suggestionControl.acceptanceHotkey,
 			triggerHotkey: this.settings.suggestionControl.manualActivationKey,
 		});
-		const selectionMenu = selectionMenuPlugin(async (instruction, thinking) => {
-			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-			if (!view) return false;
-			const session = await this.completionService.rewriteSelection(instruction, thinking);
-			if (!session) return false;
-			const cm = (view.editor as unknown as { cm?: EditorView }).cm;
-			if (!cm) return false;
-			cm.dispatch({ effects: setDiffEffect.of(session) });
-			return true;
-		});
+		const selectionMenu = selectionMenuPlugin(
+			async (instruction, thinking) => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view) return false;
+				const session = await this.completionService.rewriteSelection(instruction, thinking);
+				if (!session) return false;
+				const cm = (view.editor as unknown as { cm?: EditorView }).cm;
+				if (!cm) return false;
+				cm.dispatch({ effects: setDiffEffect.of(session) });
+				return true;
+			},
+			() => this.settings.suggestionControl.selectionMenuPlacement
+		);
 		this.registerEditorExtension([extension, diffSessionState, selectionMenu]);
 	}
 
