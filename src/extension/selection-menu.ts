@@ -44,6 +44,8 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
             view: EditorView;
             menu: HTMLElement | null = null;
             thinking = true;
+            private refreshTimer: number | null = null;
+            private readonly SHOW_DELAY_MS = 350;
             private onKeyDown = (e: KeyboardEvent) => {
                 if (!this.menu || this.menu.style.display === "none") return;
                 if (e.key === "Escape") {
@@ -65,6 +67,10 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
             }
 
             destroy() {
+                if (this.refreshTimer !== null) {
+                    window.clearTimeout(this.refreshTimer);
+                    this.refreshTimer = null;
+                }
                 document.removeEventListener("keydown", this.onKeyDown, true);
                 document.removeEventListener("mousedown", this.onMouseDown, true);
                 this.menu?.remove();
@@ -72,9 +78,33 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
             }
 
             update(update: ViewUpdate) {
-                if (update.selectionSet || update.docChanged || update.geometryChanged) {
-                    this.refresh();
+                if (update.selectionSet || update.docChanged) {
+                    const sel = update.state.selection.main;
+                    if (sel.empty || sel.from === sel.to) {
+                        // Collapse hides immediately — no lingering menu.
+                        this.hide();
+                        return;
+                    }
+                    // Show is debounced: while the user drags the selection the
+                    // timer keeps resetting, so the menu pops up only once the
+                    // selection has settled (and never follows the cursor).
+                    this.scheduleShow();
+                } else if (update.geometryChanged) {
+                    // Scroll/resize: reposition an already-visible menu right
+                    // away. coordsAtPos() is forbidden during the update cycle,
+                    // so defer to a microtask.
+                    if (this.menu && this.menu.style.display !== "none") {
+                        queueMicrotask(() => this.refresh());
+                    }
                 }
+            }
+
+            private scheduleShow() {
+                if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
+                this.refreshTimer = window.setTimeout(() => {
+                    this.refreshTimer = null;
+                    this.refresh();
+                }, this.SHOW_DELAY_MS);
             }
 
             private refresh() {
@@ -104,6 +134,10 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
             }
 
             private hide() {
+                if (this.refreshTimer !== null) {
+                    window.clearTimeout(this.refreshTimer);
+                    this.refreshTimer = null;
+                }
                 if (this.menu) this.menu.style.display = "none";
             }
 
