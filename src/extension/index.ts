@@ -10,7 +10,7 @@
 import { EditorState } from '@codemirror/state';
 import { suggestionRenderer } from './renderer';
 import { createDebouncedFetcher } from './fetcher';
-import { createAcceptanceHandler, createTriggerHandler } from './handlers';
+import { createAcceptanceHandler, createAcceptAllHandler, createTriggerHandler } from './handlers';
 import { suggestionSessionState } from './session';
 import type { InlineCompletionConfig, Suggestion } from './types';
 
@@ -42,12 +42,17 @@ export function inlineSuggestions(config: InlineCompletionConfig) {
         staticHotkey,
         getOptions
     );
+    const acceptAllHandler = createAcceptAllHandler(
+        terminate,
+        config.acceptAllHotkey || 'Mod-Enter'
+    );
 
     const extensions = [
         suggestionSessionState,
         fetcherPlugin,
         suggestionRenderer,
         acceptanceHandler,
+        acceptAllHandler,
     ];
 
     if (config.triggerHotkey) {

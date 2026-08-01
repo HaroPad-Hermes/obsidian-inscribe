@@ -15,6 +15,9 @@ export interface InlineCompletionConfig {
     ) => AsyncGenerator<Suggestion> | Promise<Suggestion>;
     // (Optional) A static hotkey for accepting suggestions.
     acceptanceHotkey?: string;
+    // (Optional) A hotkey for accepting the ENTIRE suggestion at once
+    // (defaults to Mod-Enter, i.e. Ctrl+Enter on Windows/Linux).
+    acceptAllHotkey?: string;
     // (Optional) A static hotkey for manually triggering suggestions.
     triggerHotkey?: string;
     // A function that returns current options.

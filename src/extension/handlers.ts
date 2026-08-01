@@ -16,6 +16,15 @@ const insertCompletion = (state: EditorState, text: string) => {
     };
 };
 
+// Insert the given text at the cursor and reset the suggestion session.
+const acceptAndClear = (view: EditorView, text: string, terminateFetch: () => void) => {
+    view.dispatch({
+        ...insertCompletion(view.state, text),
+        effects: SuggestionUpdateEffect.of({ content: null, document: null, anchor: null }),
+    });
+    terminateFetch();
+};
+
 // Returns a key binding that accepts the current suggestion.
 export const createAcceptanceHandler = (
     terminateFetch: () => void,
@@ -49,6 +58,25 @@ export const createAcceptanceHandler = (
                     });
 
                     if (!remaining) terminateFetch();
+                    return true;
+                },
+            },
+        ])
+    );
+
+// Returns a key binding that accepts the ENTIRE suggestion at once.
+export const createAcceptAllHandler = (
+    terminateFetch: () => void,
+    hotkey: string = 'Mod-Enter'
+) =>
+    Prec.highest(
+        keymap.of([
+            {
+                key: hotkey,
+                run: (view: EditorView) => {
+                    const session = view.state.field(suggestionSessionState);
+                    if (!session.remainingText) return false;
+                    acceptAndClear(view, session.remainingText, terminateFetch);
                     return true;
                 },
             },
