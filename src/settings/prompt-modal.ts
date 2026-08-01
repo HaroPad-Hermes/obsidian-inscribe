@@ -24,7 +24,7 @@ export class PromptModal extends Modal {
 
         new Setting(contentEl)
             .setName("System prompt override")
-            .setDesc("Stored as `ai-prompt` in frontmatter. Replaces the profile system prompt for this note only. Leave empty to use the profile prompt.")
+            .setDesc("Stored as `ai-prompt` in frontmatter. Replaces the profile prompt for this note; the autocomplete contract (no meta-text, never repeat words) is appended automatically. Leave empty for none.")
             .addTextArea((ta) => {
                 ta.inputEl.rows = 6;
                 ta.setValue(this.aiPrompt);

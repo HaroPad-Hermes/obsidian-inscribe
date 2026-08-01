@@ -33,6 +33,12 @@ export function limitSentences(s: string, max?: number): string {
 // Build the effective system prompt from note frontmatter:
 //  - `ai-prompt`  replaces the profile prompt entirely (always honored)
 //  - `ai-context` appends DOCUMENT CONTEXT (gated by the aiContext toggle)
+// The essential autocomplete contract, appended to any `ai-prompt` override so
+// the model still knows its job (output only the continuation, never repeat
+// the typed text) even when the profile prompt is replaced entirely.
+export const COMPLETION_CONSTRAINTS =
+    "Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
+
 export function buildSystemPromptFrom(
     fm: Record<string, unknown> | undefined,
     systemPrompt: string,
@@ -41,7 +47,7 @@ export function buildSystemPromptFrom(
     if (!fm) return systemPrompt;
     const custom = fm["ai-prompt"];
     if (typeof custom === "string" && custom.trim()) {
-        return custom.trim();
+        return custom.trim() + "\n\n" + COMPLETION_CONSTRAINTS;
     }
     if (aiContext) {
         const ctx = fm["ai-context"];

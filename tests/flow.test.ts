@@ -151,11 +151,16 @@ describe("buildSystemPromptFrom — per-document prompts", () => {
     it("no frontmatter → base prompt", () => {
         expect(buildSystemPromptFrom(undefined, base, true)).toBe(base);
     });
-    it("ai-prompt replaces the base entirely", () => {
-        expect(buildSystemPromptFrom({ "ai-prompt": "Custom" }, base, true)).toBe("Custom");
+    it("ai-prompt replaces the base entirely (contract appended)", () => {
+        const out = buildSystemPromptFrom({ "ai-prompt": "Custom" }, base, true);
+        expect(out.startsWith("Custom")).toBe(true);
+        expect(out).toContain("Never repeat words already in the text");
+        expect(out).toContain("Output only the continuation text");
     });
     it("ai-prompt wins over ai-context", () => {
-        expect(buildSystemPromptFrom({ "ai-prompt": "Custom", "ai-context": "Ctx" }, base, true)).toBe("Custom");
+        const out = buildSystemPromptFrom({ "ai-prompt": "Custom", "ai-context": "Ctx" }, base, true);
+        expect(out.startsWith("Custom")).toBe(true);
+        expect(out).not.toContain("DOCUMENT CONTEXT");
     });
     it("ai-context appends when gated on", () => {
         expect(buildSystemPromptFrom({ "ai-context": "Writing a report" }, base, true))
