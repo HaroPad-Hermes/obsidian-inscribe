@@ -37,6 +37,18 @@ describe("diffSessionState", () => {
         expect(next.doc.toString()).toBe("Hello universe!");
     });
 
+    it("zero-length session (generate): inserts at the cursor on accept", () => {
+        const gen: DiffSession = { from: 5, to: 5, original: "", rewritten: " NEW" };
+        const state = makeState().update({ effects: setDiffEffect.of(gen) }).state;
+        expect(state.field(diffSessionState)).toEqual(gen);
+        const next = state.update({
+            changes: { from: gen.from, to: gen.to, insert: gen.rewritten },
+            effects: setDiffEffect.of(null),
+            userEvent: "inscribe.diff.accept",
+        }).state;
+        expect(next.doc.toString()).toBe("Hello NEW world!");
+    });
+
     it("discard keeps the document unchanged", () => {
         const state = makeState().update({ effects: setDiffEffect.of(session) }).state;
         const next = state.update({ effects: setDiffEffect.of(null), userEvent: "inscribe.diff.discard" }).state;

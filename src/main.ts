@@ -11,6 +11,7 @@ import CompletionService from './completions/service';
 import StatusBarItem from './statusbar/statusbar';
 import { PromptModal } from './settings/prompt-modal';
 import { RewriteModal } from './settings/rewrite-modal';
+import { GenerateModal } from './settings/generate-modal';
 import { deepMerge } from './settings/load';
 
 export default class Inscribe extends Plugin {
@@ -56,6 +57,27 @@ export default class Inscribe extends Plugin {
 				new RewriteModal(this.app, this.completionService).open();
 			},
 		});
+
+		this.addCommand({
+			id: "generate-text",
+			name: "Generate text with AI",
+			callback: () => {
+				new GenerateModal(this.app, this.completionService).open();
+			},
+		});
+
+		// Hook the native editor context menu (right-click in a note).
+		this.registerEvent(
+			this.app.workspace.on("editor-menu", (menu) => {
+				menu.addItem((item) => {
+					item.setTitle("Generate with AI…")
+						.setIcon("sparkles")
+						.onClick(() => {
+							new GenerateModal(this.app, this.completionService).open();
+						});
+				});
+			})
+		);
 
 		await this.setupExtension();
 	}

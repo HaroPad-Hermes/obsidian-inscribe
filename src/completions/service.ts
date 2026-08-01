@@ -6,7 +6,7 @@ import { ProfileOptions, Settings } from "src/settings/settings";
 import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
 import { buildSystemPromptFrom, computeGhost, WORD_VALIDITY_SYSTEM } from "src/completions/flow";
-import { buildRewriteMessages } from "src/completions/rewrite";
+import { buildRewriteMessages, buildGenerateMessages } from "src/completions/rewrite";
 import { DiffSession } from "src/extension/diff";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
@@ -185,6 +185,49 @@ export default class CompletionService {
         } catch (error) {
             console.error("Inscribe: rewrite failed", error);
             new Notice("Inscribe: rewrite failed — see console");
+            return null;
+        }
+    }
+
+    // Generate new text from scratch at the cursor (or replacing the current
+    // selection). The whole document around the cursor is sent as context
+    // (up to 20000 chars each side), with a <cursor> marker. Returns the diff
+    // session so the result shows as an inline Accept/Discard insertion.
+    async generateText(instruction: string, thinking: boolean): Promise<DiffSession | null> {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const editor = view?.editor;
+        if (!editor) return null;
+
+        const profile = this.profileService.getActiveProfile();
+        const provider = this.providerFactory.getProvider(profile.provider);
+        const options = profile.completionOptions;
+
+        const from = editor.posToOffset(editor.getCursor("from"));
+        const to = editor.posToOffset(editor.getCursor("to"));
+        const fullText = editor.getValue();
+
+        const messages = buildGenerateMessages({
+            instruction,
+            before: fullText.slice(0, from),
+            after: fullText.slice(to),
+        });
+
+        try {
+            const result = await provider.generateOnce!(messages, {
+                model: options.model,
+                maxTokens: 2000,
+                temperature: 0.7,
+                thinking: thinking ? "enabled" : "disabled",
+            });
+            const generated = (result || "").trim();
+            if (!generated) {
+                new Notice("Inscribe: the model returned nothing");
+                return null;
+            }
+            return { from, to, original: editor.getSelection(), rewritten: generated };
+        } catch (error) {
+            console.error("Inscribe: generate failed", error);
+            new Notice("Inscribe: generate failed — see console");
             return null;
         }
     }

@@ -189,3 +189,11 @@
     outline: none;
     border-color: var(--interactive-accent);
 }
+
+/* ── Generate modal ── */
+.inscribe-generate-input {
+    width: 100%;
+    min-width: 420px;
+    resize: vertical;
+    font-family: var(--font-text);
+}

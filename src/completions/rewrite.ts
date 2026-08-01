@@ -49,3 +49,37 @@ export function buildRewriteMessages(input: RewriteInput): Array<{ role: "system
         },
     ];
 }
+
+// ── Generate from scratch ────────────────────────────────────────────────
+
+export const GENERATE_SYSTEM_PROMPT =
+    "You write new text at the position marked <cursor>. Use the surrounding context for style, tone, and continuity.\n" +
+    "Output ONLY the text to insert — no explanations, no meta-text, no markers. Preserve markdown formatting.";
+
+const GENERATE_CONTEXT_LIMIT = 20000; // generous context each side of the cursor
+
+export interface GenerateInput {
+    instruction: string;
+    before: string;
+    after: string;
+}
+
+export function buildGenerateMessages(input: GenerateInput): Array<{ role: "system" | "user"; content: string }> {
+    const before = input.before.slice(-GENERATE_CONTEXT_LIMIT);
+    const after = input.after.slice(0, GENERATE_CONTEXT_LIMIT);
+    return [
+        { role: "system", content: GENERATE_SYSTEM_PROMPT },
+        {
+            role: "user",
+            content: [
+                `Instruction: ${input.instruction}`,
+                "",
+                before ? `<context_before>\n${before}\n</context_before>` : "<context_before></context_before>",
+                "",
+                "<cursor>",
+                "",
+                after ? `<context_after>\n${after}\n</context_after>` : "<context_after></context_after>",
+            ].join("\n"),
+        },
+    ];
+}
