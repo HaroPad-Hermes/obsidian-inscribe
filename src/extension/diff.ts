@@ -95,8 +95,10 @@ export const diffSessionState = StateField.define<DiffSession | null>({
                 Decoration.replace({ inclusive: false }).range(session.from, session.to),
                 Decoration.widget({ widget: new DiffButtonsWidget(session), side: 1 }).range(session.to),
             ];
-            // RangeSetBuilder requires ranges sorted by (from, startSide).
-            decos.sort((a, b) => a.from - b.from || a.startSide - b.startSide);
+            // RangeSetBuilder requires ranges sorted by (from, startSide);
+            // startSide exists at runtime but is untyped on Range.
+            const sideOf = (r: { from: number; startSide?: number }) => r.startSide ?? 0;
+            decos.sort((a, b) => a.from - b.from || sideOf(a) - sideOf(b));
             return Decoration.set(decos);
         }),
 });
