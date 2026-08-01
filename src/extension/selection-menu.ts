@@ -10,22 +10,17 @@ export interface SelectionMenuRunner {
     (instruction: string, thinking: boolean): Promise<boolean>;
 }
 
-interface RectLike {
-    left: number;
-    top: number;
-    bottom: number;
-}
-
-// Pure positioning: place the menu below the selection start, flipping above
-// when it would overflow the viewport. Unit-testable.
+// Pure positioning: center the menu horizontally on the selection's midpoint,
+// below the selection's bottom edge, flipping above when it would overflow the
+// viewport. Unit-testable.
 export function computeMenuPosition(
-    anchor: RectLike,
-    menuHeight: number,
+    anchor: { midX: number; top: number; bottom: number },
+    menu: { width: number; height: number },
     viewport: { width: number; height: number }
 ): { left: number; top: number } {
-    const left = Math.max(8, Math.min(anchor.left, viewport.width - 260));
+    const left = Math.max(8, Math.min(anchor.midX - menu.width / 2, viewport.width - menu.width - 8));
     const below = anchor.bottom + 6;
-    const top = below + menuHeight > viewport.height - 8 ? Math.max(8, anchor.top - menuHeight - 6) : below;
+    const top = below + menu.height > viewport.height - 8 ? Math.max(8, anchor.top - menu.height - 6) : below;
     return { left, top };
 }
 
@@ -113,19 +108,28 @@ export function selectionMenuPlugin(run: SelectionMenuRunner) {
                     this.hide();
                     return;
                 }
-                const coords = this.view.coordsAtPos(sel.from);
-                if (!coords) {
+                const from = this.view.coordsAtPos(sel.from);
+                const to = this.view.coordsAtPos(sel.to);
+                if (!from || !to) {
                     this.hide();
                     return;
                 }
-                this.show(coords);
+                this.show({
+                    // Anchor on the middle of the selection, not its start.
+                    midX: (from.left + to.right) / 2,
+                    top: Math.min(from.top, to.top),
+                    bottom: Math.max(from.bottom, to.bottom),
+                });
             }
 
-            private show(anchor: RectLike) {
+            private show(anchor: { midX: number; top: number; bottom: number }) {
                 if (!this.menu) this.build();
                 const menu = this.menu!;
                 menu.style.display = "flex";
-                const { left, top } = computeMenuPosition(anchor, menu.offsetHeight || 34, {
+                const { left, top } = computeMenuPosition(anchor, {
+                    width: menu.offsetWidth || 260,
+                    height: menu.offsetHeight || 34,
+                }, {
                     width: window.innerWidth,
                     height: window.innerHeight,
                 });
