@@ -21,14 +21,18 @@ class DiffTextWidget extends WidgetType {
         super();
     }
 
-    toDOM(): HTMLElement {
-        const span = document.createElement("span");
-        span.className = "inscribe-diff-new";
-        span.textContent = this.text;
-        return span;
+    toDOM() {
+        // BLOCK element, not inline: an inline widget can only lay out within
+        // its own line box, so multi-line rewrites get squeezed/staggered
+        // across the replaced lines. A block widget owns the whole replaced
+        // range and renders the line structure correctly.
+        const div = document.createElement("div");
+        div.className = "inscribe-diff-new";
+        div.textContent = this.text;
+        return div;
     }
 
-    ignoreEvent(): boolean {
+    ignoreEvent() {
         return true;
     }
 }
