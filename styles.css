@@ -204,3 +204,8 @@
     background: var(--text-highlight-bg, rgba(128, 128, 255, 0.3)) !important;
     opacity: 1 !important;
 }
+
+/* ── Our own selection highlight while the menu is open (blur-safe) ── */
+.inscribe-menu-selection {
+    background-color: hsla(var(--color-accent-hsl), 0.33) !important;
+}

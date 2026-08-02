@@ -2,9 +2,10 @@
 // selection bar): preset rewrite buttons + an "Ask AI anything…" input + a
 // thinking toggle. On action it calls the injected runner; the caller decides
 // what to do with the result (dispatch the inline diff).
-import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { setIcon, setTooltip } from "obsidian";
 import { REWRITE_PRESETS } from "src/completions/rewrite";
+import { diffSessionState } from "./diff";
 import type { SelectionMenuPlacement, SelectionMenuSide } from "src/settings/settings";
 
 export interface SelectionMenuRunner {
@@ -86,8 +87,7 @@ export function selectionMenuPlugin(
     getPullIn: () => boolean
 ) {
     return ViewPlugin.fromClass(
-        class {
-            view: EditorView;
+        class {            view: EditorView;
             menu: HTMLElement | null = null;
             thinking = true;
             private refreshTimer: number | null = null;
@@ -294,6 +294,22 @@ export function selectionMenuPlugin(
                 const ok = await run(instruction, this.thinking);
                 if (ok) this.hide();
             }
+        },
+        {
+            // While the menu is open and the editor is unfocused (e.g. the
+            // user clicked the input), draw our own selection highlight —
+            // themes may hide the native one on blur, which is confusing.
+            // Skipped while a diff session is active (it has its own highlight).
+            decorations: (plugin: { view: EditorView; menu: HTMLElement | null }): DecorationSet => {
+                const v = plugin.view;
+                if (v.hasFocus || !plugin.menu || plugin.menu.style.display === "none") return Decoration.none;
+                if (v.state.field(diffSessionState, false)) return Decoration.none;
+                const sel = v.state.selection.main;
+                if (sel.empty) return Decoration.none;
+                return Decoration.set([
+                    Decoration.mark({ class: "inscribe-menu-selection" }).range(sel.from, sel.to),
+                ]);
+            },
         }
     );
 }
