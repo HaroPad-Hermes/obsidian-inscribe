@@ -197,3 +197,9 @@
     resize: vertical;
     font-family: var(--font-text);
 }
+
+/* ── Selection stays visible while the menu is open ── */
+.inscribe-menu-open .cm-editor:not(.cm-focused) .cm-selectionBackground {
+    background: var(--text-highlight-bg) !important;
+    opacity: 1 !important;
+}

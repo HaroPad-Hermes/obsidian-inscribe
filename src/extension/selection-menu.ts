@@ -117,6 +117,7 @@ export function selectionMenuPlugin(
                     window.clearTimeout(this.refreshTimer);
                     this.refreshTimer = null;
                 }
+                document.body.classList.remove("inscribe-menu-open");
                 document.removeEventListener("keydown", this.onKeyDown, true);
                 document.removeEventListener("mousedown", this.onMouseDown, true);
                 this.menu?.remove();
@@ -200,6 +201,10 @@ export function selectionMenuPlugin(
                 if (!this.menu) this.build();
                 const menu = this.menu!;
                 menu.style.display = "flex";
+                // Keep the selection highlight visible even when the editor
+                // loses focus to the menu's input (Obsidian themes hide the
+                // selection on blur). Removed in hide()/destroy().
+                document.body.classList.add("inscribe-menu-open");
                 const width = menu.offsetWidth || 260;
                 const left = resolveMenuLeft(
                     getPlacement(),
@@ -227,6 +232,7 @@ export function selectionMenuPlugin(
                     window.clearTimeout(this.refreshTimer);
                     this.refreshTimer = null;
                 }
+                document.body.classList.remove("inscribe-menu-open");
                 if (this.menu) this.menu.style.display = "none";
             }
 
