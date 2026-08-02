@@ -199,7 +199,8 @@
 }
 
 /* ── Selection stays visible while the menu is open ── */
+.inscribe-menu-open .cm-editor:not(.cm-focused) > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
 .inscribe-menu-open .cm-editor:not(.cm-focused) .cm-selectionBackground {
-    background: var(--text-highlight-bg) !important;
+    background: var(--text-highlight-bg, rgba(128, 128, 255, 0.3)) !important;
     opacity: 1 !important;
 }
