@@ -102,6 +102,9 @@
     background: rgba(92, 207, 255, 0.18);
     border-radius: 3px;
     box-decoration-break: clone;
+    /* preserve line breaks in multi-line rewrites — default white-space
+       collapses newlines, turning a rewritten list into a run-on line */
+    white-space: pre-wrap;
     -webkit-box-decoration-break: clone;
 }
 .inscribe-diff-buttons {
