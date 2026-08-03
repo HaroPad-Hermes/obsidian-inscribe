@@ -227,42 +227,6 @@ describe("computeGhost — markdown stripping", () => {
 });
 
 
-describe("headingSeparator (heading line guard)", () => {
-    it("new word after a heading starts on a new line", async () => {
-        // "## The Water Cycle" + continuation "The sun..." -> candidate
-        // "CycleThe" implausible -> space -> but the line is a heading -> "\n"
-        const ghost = await computeGhost("## The Water Cycle", SYS, {
-            continueText: async () => "The sun drives evaporation",
-            isPlausibleWord: async () => false,
-        }, { maxSentences: 1 });
-        expect(ghost).toBe("\nThe sun drives evaporation");
-    });
-
-    it("mid-heading word completion still attaches (no newline)", async () => {
-        const ghost = await computeGhost("## The Water Cyc", SYS, {
-            continueText: async () => "le, which drives the weather",
-            isPlausibleWord: async () => true,
-        }, { maxSentences: 1 });
-        expect(ghost).toBe("le, which drives the weather");
-    });
-
-    it("plain paragraph line keeps the normal space separator", async () => {
-        const ghost = await computeGhost("The water cycle begins with evaporation", SYS, {
-            continueText: async () => "from the oceans",
-            isPlausibleWord: async () => false,
-        }, { maxSentences: 1 });
-        expect(ghost).toBe(" from the oceans");
-    });
-
-    it("trailing-space case after a heading also breaks the line", async () => {
-        const ghost = await computeGhost("## The Water Cycle ", SYS, {
-            continueText: async () => "The sun drives evaporation",
-            isPlausibleWord: async () => true,
-        }, { maxSentences: 1 });
-        expect(ghost).toBe("\nThe sun drives evaporation");
-    });
-});
-
 describe("computeGhost raw continuation argument (FIM)", () => {
     it("passes the windowed raw prefix as the second argument", async () => {
         let receivedPrompt = "";

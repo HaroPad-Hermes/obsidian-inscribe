@@ -37,7 +37,7 @@ export function limitSentences(s: string, max?: number): string {
 // the model still knows its job (output only the continuation, never repeat
 // the typed text) even when the profile prompt is replaced entirely.
 export const COMPLETION_CONSTRAINTS =
-    "Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing. Continue only the very last word or sentence at the end of the text; never complete or re-emit earlier sentences or list items. Write in Markdown, matching the surrounding structure — always start a new line after a heading before body text.";
+    "Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing. Continue only the very last word or sentence at the end of the text; never complete or re-emit earlier sentences or list items.";
 
 export function buildSystemPromptFrom(
     fm: Record<string, unknown> | undefined,
@@ -128,15 +128,6 @@ export function continuationWindow(text: string, maxLines = 2, maxLineChars = 60
         .join("\n");
 }
 
-// A new word/sentence after a markdown heading must start on a NEW line —
-// otherwise Obsidian renders it with the heading's font size. Returns the
-// separator to place before a continuation that starts a new word.
-function headingSeparator(text: string): string {
-    if (text.endsWith("\n")) return " "; // already on a fresh line
-    const line = text.slice(text.lastIndexOf("\n") + 1);
-    return /^#{1,6}\s+\S/.test(line) ? "\n" : " ";
-}
-
 export async function computeGhost(
     text: string,
     systemPrompt: string,
@@ -153,11 +144,7 @@ export async function computeGhost(
         if (sentence === null) return null;
         const result = clean(sentence);
         if (!result || isStuckMarker(result)) return null;
-        // Heading line: a trailing space after "## Rubrik " still belongs to the
-        // heading — body text must begin on a new line. Normal lines keep the
-        // case-1 contract (no leading space added).
-        if (result.startsWith("\n")) return result;
-        return headingSeparator(text) === "\n" ? "\n" + result : result;
+        return result;
     }
 
     // Case 2: no trailing space — the continuation completes the word or
@@ -179,9 +166,8 @@ export async function computeGhost(
     const plausible = await cb.isPlausibleWord(text, lastWord + firstToken);
     if (plausible === null) {
         // Check aborted — conservative fallback: a capitalized continuation
-        // is a new sentence (space); lowercase attaches. A heading line needs
-        // a real line break instead of a space.
-        return /^[A-ZÅÄÖ0-9]/.test(cleaned) ? headingSeparator(text) + cleaned : cleaned;
+        // is a new sentence (space); lowercase attaches.
+        return /^[A-ZÅÄÖ0-9]/.test(cleaned) ? ' ' + cleaned : cleaned;
     }
-    return plausible ? cleaned : headingSeparator(text) + cleaned;
+    return plausible ? cleaned : ' ' + cleaned;
 }
