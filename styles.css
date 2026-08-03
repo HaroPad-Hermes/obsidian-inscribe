@@ -102,6 +102,13 @@
     background: rgba(92, 207, 255, 0.18);
     border-radius: 3px;
     box-decoration-break: clone;
+    /* The widget lives inside the replaced line's box, so it inherits the
+       line's typography — a ghost after a heading rendered at heading size
+       and weight. Force body typography on the preview (the accepted text
+       lands on a real new line and renders fine on its own). */
+    font-size: var(--font-text-size);
+    font-weight: normal;
+    line-height: var(--line-height-normal, 1.5);
     /* preserve line breaks in multi-line rewrites — default white-space
        collapses newlines, turning a rewritten list into a run-on line */
     white-space: pre-wrap;
