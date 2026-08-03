@@ -241,7 +241,9 @@
 }
 .inscribe-diff-new li {
     margin: 0 !important;
-    padding: 0 !important;
+    /* Live Preview list lines carry --list-spacing top/bottom — restore it */
+    padding-top: var(--list-spacing) !important;
+    padding-bottom: var(--list-spacing) !important;
 }
 .inscribe-diff-new li > p,
 .inscribe-diff-new p {
@@ -254,6 +256,30 @@
 .inscribe-diff-new h5,
 .inscribe-diff-new h6 {
     margin: 0 !important;
+}
+/* Live Preview's heading spacing: the heading line has padding-top
+   var(--p-spacing) and the following line var(--p-spacing-empty) */
+.inscribe-diff-new h1,
+.inscribe-diff-new h2,
+.inscribe-diff-new h3,
+.inscribe-diff-new h4,
+.inscribe-diff-new h5,
+.inscribe-diff-new h6 {
+    padding-top: var(--p-spacing);
+}
+.inscribe-diff-new h1 + ol,
+.inscribe-diff-new h1 + ul,
+.inscribe-diff-new h2 + ol,
+.inscribe-diff-new h2 + ul,
+.inscribe-diff-new h3 + ol,
+.inscribe-diff-new h3 + ul,
+.inscribe-diff-new h4 + ol,
+.inscribe-diff-new h4 + ul,
+.inscribe-diff-new h5 + ol,
+.inscribe-diff-new h5 + ul,
+.inscribe-diff-new h6 + ol,
+.inscribe-diff-new h6 + ul {
+    padding-top: var(--p-spacing-empty);
 }.inscribe-diff-new.markdown-rendered li,
 .inscribe-diff-new .markdown-rendered li {
     margin: 0;
