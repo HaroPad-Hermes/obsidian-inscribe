@@ -224,9 +224,12 @@
 .inscribe-diff-list {
     display: block;
     margin: 0;
-    text-indent: calc(-1 * var(--list-indent, 2em));
+    position: relative;
     padding-left: var(--list-indent, 2em);
 }
 .inscribe-diff-marker {
+    position: absolute;
+    left: 0;
+    top: 0;
     color: var(--list-marker-color, var(--text-faint));
 }

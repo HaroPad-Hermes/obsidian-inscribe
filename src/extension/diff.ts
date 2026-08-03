@@ -60,7 +60,9 @@ class DiffTextWidget extends WidgetType {
             // renders as one continuous block.
             parts.push("\n");
         }
-        if (parts.length > 0) parts.pop(); // no trailing newline
+        // Only drop a trailing "\n" — a trailing list item ends with its block
+        // span (no "\n"), so a blind pop() would delete the final row.
+        if (parts[parts.length - 1] === "\n") parts.pop();
         div.append(...parts);
         return div;
     }
