@@ -237,7 +237,9 @@
 .inscribe-diff-new ol,
 .inscribe-diff-new ul {
     margin: 0 !important;
-    padding-inline-start: 1.1em !important;
+    /* content hugs the marker (accepted text starts ~10px in; 1.1em was
+       visibly further right) */
+    padding-inline-start: 0.6em !important;
 }
 .inscribe-diff-new li {
     margin: 0 !important;
@@ -255,7 +257,9 @@
 .inscribe-diff-new h4,
 .inscribe-diff-new h5,
 .inscribe-diff-new h6 {
-    margin: 0 !important;
+    /* Obsidian renders headings with margin-block-end: var(--p-spacing) —
+       that's the empty line between the heading and the following text */
+    margin: 0 0 var(--p-spacing) 0 !important;
 }
 /* Live Preview's heading spacing: the heading line has padding-top
    var(--p-spacing) and the following line var(--p-spacing-empty) */
