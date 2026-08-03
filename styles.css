@@ -231,16 +231,16 @@
 }
 .inscribe-diff-new ol,
 .inscribe-diff-new ul {
-    margin: 0;
-    padding-inline-start: 1.1em;
+    margin: 0 !important;
+    padding-inline-start: 1.1em !important;
 }
 .inscribe-diff-new li {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 .inscribe-diff-new li > p,
 .inscribe-diff-new p {
-    margin: 0;
+    margin: 0 !important;
 }
 .inscribe-diff-new h1,
 .inscribe-diff-new h2,
@@ -248,7 +248,7 @@
 .inscribe-diff-new h4,
 .inscribe-diff-new h5,
 .inscribe-diff-new h6 {
-    margin: 0;
+    margin: 0 !important;
 }.inscribe-diff-new.markdown-rendered li,
 .inscribe-diff-new .markdown-rendered li {
     margin: 0;
