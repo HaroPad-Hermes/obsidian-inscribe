@@ -33,10 +33,18 @@ class DiffTextWidget extends WidgetType {
         // Preview's per-line layout (markdown would otherwise merge them).
         const container = document.createElement("div");
         container.className = "inscribe-diff-new";
-        container.textContent = this.text; // instant fallback
+        // renderMarkdown APPENDS into the element (it does not clear it), so
+        // the plain-text fallback lives in its own child and is removed once
+        // the real render lands — otherwise the raw text lingers above the
+        // rendered ghost.
+        const fallback = document.createElement("div");
+        fallback.className = "inscribe-diff-fallback";
+        fallback.textContent = this.text;
+        container.appendChild(fallback);
         const display = this.text.replace(/([^\n])\n(?!\n)/g, "$1  \n");
         void MarkdownRenderer.renderMarkdown(display, container, "", DiffTextWidget.renderComponent)
             .then(() => {
+                fallback.remove();
                 view.requestMeasure();
             })
             .catch(() => {
