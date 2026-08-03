@@ -44,7 +44,11 @@ class DiffTextWidget extends WidgetType {
             } else {
                 parts.push(line);
             }
+            // split() strips the line breaks — restore them or the preview
+            // renders as one continuous block.
+            parts.push("\n");
         }
+        if (parts.length > 0) parts.pop(); // no trailing newline
         div.append(...parts);
         return div;
     }
