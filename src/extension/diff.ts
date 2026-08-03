@@ -3,6 +3,7 @@
 // place with Accept / Discard buttons (plate-style).
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import { Component, MarkdownRenderer } from "obsidian";
 
 export interface DiffSession {
     from: number;
@@ -21,50 +22,27 @@ class DiffTextWidget extends WidgetType {
         super();
     }
 
-    toDOM() {
-        // Block element: a block widget owns the whole replaced range, which
-        // is the only legal way to lay out multi-line previews correctly.
-        // Headings inside the preview are rendered at their real scale via
-        // Obsidian's heading variables, relative to the widget's body-size
-        // base font (set in styles.css).
-        const div = document.createElement("div");
-        div.className = "inscribe-diff-new";
-        const parts: Array<string | HTMLElement> = [];
-        for (const line of this.text.split("\n")) {
-            const heading = line.match(/^(#{1,6})\s+(.*)$/);
-            const listItem = line.match(/^(\d+\.|[-*+])(\s+.*)$/);
-            if (heading) {
-                const level = heading[1].length;
-                const span = document.createElement("span");
-                span.className = "inscribe-diff-heading";
-                const fallback = [1.6, 1.4, 1.25, 1.1, 1, 1][level - 1];
-                span.style.fontSize = `var(--h${level}-size, ${fallback}em)`;
-                span.style.fontWeight = `var(--h${level}-weight, bold)`;
-                span.textContent = line;
-                parts.push(span);
-            } else if (listItem) {
-                // Mimic Obsidian's markdown list rendering: marker column +
-                // hanging indent (wrapped lines align after the marker).
-                const span = document.createElement("span");
-                span.className = "inscribe-diff-list";
-                const marker = document.createElement("span");
-                marker.className = "inscribe-diff-marker";
-                marker.textContent = listItem[1];
-                span.append(marker, document.createTextNode(listItem[2]));
-                parts.push(span); // block-level — no "\n" needed
-                continue;
-            } else {
-                parts.push(line);
-            }
-            // split() strips the line breaks — restore them or the preview
-            // renders as one continuous block.
-            parts.push("\n");
-        }
-        // Only drop a trailing "\n" — a trailing list item ends with its block
-        // span (no "\n"), so a blind pop() would delete the final row.
-        if (parts[parts.length - 1] === "\n") parts.pop();
-        div.append(...parts);
-        return div;
+    // Reused for every widget instance — renderMarkdown registers cleanup on
+    // the component; a long-lived one avoids unbounded growth.
+    private static renderComponent = new Component();
+
+    toDOM(view: EditorView) {
+        // Render the preview with Obsidian's OWN markdown renderer — exact
+        // theme styling for headings, lists, code, etc. (no CSS guesswork).
+        // Single newlines become hard breaks so the preview matches Live
+        // Preview's per-line layout (markdown would otherwise merge them).
+        const container = document.createElement("div");
+        container.className = "inscribe-diff-new";
+        container.textContent = this.text; // instant fallback
+        const display = this.text.replace(/([^\n])\n(?!\n)/g, "$1  \n");
+        void MarkdownRenderer.renderMarkdown(display, container, "", DiffTextWidget.renderComponent)
+            .then(() => {
+                view.requestMeasure();
+            })
+            .catch(() => {
+                /* keep the plain-text fallback */
+            });
+        return container;
     }
 
     ignoreEvent() {

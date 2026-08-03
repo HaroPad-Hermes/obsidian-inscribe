@@ -220,18 +220,3 @@
     background-color: hsla(var(--color-accent-hsl), 0.33) !important;
 }
 
-/* ── Markdown list rendering in the diff preview (mimics Obsidian) ── */
-.inscribe-diff-list {
-    display: block;
-    margin: 0;
-    /* tight hanging indent: marker zone ≈ tabular "10." + the source space.
-       Wrapped lines align just past the marker, like the accepted text. */
-    padding-left: 1.1em;
-    text-indent: -1.1em;
-}
-.inscribe-diff-marker {
-    display: inline-block;
-    min-width: 1.1em;
-    font-variant-numeric: tabular-nums;
-    color: var(--list-marker-color, var(--text-faint));
-}
