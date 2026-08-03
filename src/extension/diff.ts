@@ -22,13 +22,30 @@ class DiffTextWidget extends WidgetType {
     }
 
     toDOM() {
-        // BLOCK element, not inline: an inline widget can only lay out within
-        // its own line box, so multi-line rewrites get squeezed/staggered
-        // across the replaced lines. A block widget owns the whole replaced
-        // range and renders the line structure correctly.
+        // Block element: a block widget owns the whole replaced range, which
+        // is the only legal way to lay out multi-line previews correctly.
+        // Headings inside the preview are rendered at their real scale via
+        // Obsidian's heading variables, relative to the widget's body-size
+        // base font (set in styles.css).
         const div = document.createElement("div");
         div.className = "inscribe-diff-new";
-        div.textContent = this.text;
+        const parts: Array<string | HTMLElement> = [];
+        for (const line of this.text.split("\n")) {
+            const m = line.match(/^(#{1,6})\s+(.*)$/);
+            if (m) {
+                const level = m[1].length;
+                const span = document.createElement("span");
+                span.className = "inscribe-diff-heading";
+                const fallback = [1.6, 1.4, 1.25, 1.1, 1, 1][level - 1];
+                span.style.fontSize = `var(--h${level}-size, ${fallback}em)`;
+                span.style.fontWeight = `var(--h${level}-weight, bold)`;
+                span.textContent = line;
+                parts.push(span);
+            } else {
+                parts.push(line);
+            }
+        }
+        div.append(...parts);
         return div;
     }
 
