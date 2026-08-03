@@ -92,9 +92,10 @@ export const diffSessionState = StateField.define<DiffSession | null>({
         return value;
     },
     provide: (field) =>
-        EditorView.decorations.from(field, (session, view): DecorationSet => {
+        EditorView.decorations.from(field, (session) => {
             if (!session) return Decoration.none;
-            const decos: Array<import("@codemirror/state").Range<Decoration>> = [];
+            return (view: EditorView): DecorationSet => {
+                const decos: Array<import("@codemirror/state").Range<Decoration>> = [];
             // Per-line widgets: each line of the rewritten text renders at the
             // start of the corresponding original line. A single inline widget
             // cannot lay out across replaced lines (it squeezes/staggers), and
@@ -127,5 +128,6 @@ export const diffSessionState = StateField.define<DiffSession | null>({
             const sideOf = (r: { from: number; startSide?: number }) => r.startSide ?? 0;
             decos.sort((a, b) => a.from - b.from || sideOf(a) - sideOf(b));
             return Decoration.set(decos);
+            };
         }),
 });
