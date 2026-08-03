@@ -154,8 +154,10 @@ export async function computeGhost(
         const result = clean(sentence);
         if (!result || isStuckMarker(result)) return null;
         // Heading line: a trailing space after "## Rubrik " still belongs to the
-        // heading — body text must begin on a new line.
-        return result.startsWith("\n") ? result : headingSeparator(text) + result;
+        // heading — body text must begin on a new line. Normal lines keep the
+        // case-1 contract (no leading space added).
+        if (result.startsWith("\n")) return result;
+        return headingSeparator(text) === "\n" ? "\n" + result : result;
     }
 
     // Case 2: no trailing space — the continuation completes the word or
