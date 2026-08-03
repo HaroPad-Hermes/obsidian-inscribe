@@ -109,10 +109,15 @@
     font-size: var(--font-text-size);
     font-weight: normal;
     line-height: var(--line-height-normal, 1.5);
-    /* preserve line breaks in multi-line rewrites — default white-space
-       collapses newlines, turning a rewritten list into a run-on line */
-    white-space: pre-wrap;
+    /* NO white-space: pre-wrap here — the rendered HTML is pretty-printed
+       with newlines BETWEEN block children (<li>), and pre-wrap turns each
+       of those text nodes into a phantom line break (~1 line gap per item).
+       The plain-text fallback is a child div that keeps its own pre-wrap. */
+    white-space: normal;
     -webkit-box-decoration-break: clone;
+}
+.inscribe-diff-fallback {
+    white-space: pre-wrap;
 }
 .inscribe-diff-buttons {
     margin-left: 8px;
