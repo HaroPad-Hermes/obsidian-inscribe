@@ -31,9 +31,10 @@ class DiffTextWidget extends WidgetType {
         div.className = "inscribe-diff-new";
         const parts: Array<string | HTMLElement> = [];
         for (const line of this.text.split("\n")) {
-            const m = line.match(/^(#{1,6})\s+(.*)$/);
-            if (m) {
-                const level = m[1].length;
+            const heading = line.match(/^(#{1,6})\s+(.*)$/);
+            const listItem = line.match(/^(\d+\.|[-*+])(\s+.*)$/);
+            if (heading) {
+                const level = heading[1].length;
                 const span = document.createElement("span");
                 span.className = "inscribe-diff-heading";
                 const fallback = [1.6, 1.4, 1.25, 1.1, 1, 1][level - 1];
@@ -41,6 +42,17 @@ class DiffTextWidget extends WidgetType {
                 span.style.fontWeight = `var(--h${level}-weight, bold)`;
                 span.textContent = line;
                 parts.push(span);
+            } else if (listItem) {
+                // Mimic Obsidian's markdown list rendering: marker column +
+                // hanging indent (wrapped lines align after the marker).
+                const span = document.createElement("span");
+                span.className = "inscribe-diff-list";
+                const marker = document.createElement("span");
+                marker.className = "inscribe-diff-marker";
+                marker.textContent = listItem[1];
+                span.append(marker, document.createTextNode(listItem[2]));
+                parts.push(span); // block-level — no "\n" needed
+                continue;
             } else {
                 parts.push(line);
             }
