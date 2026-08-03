@@ -225,22 +225,37 @@
    The rendered view adds ~4x list spacing, a large ol indent, and heading
    margins vs Live Preview. Match the editor's tight geometry so the ghost
    looks like the accepted text. */
+/* renderMarkdown adds the markdown-rendered class to the container ITSELF,
+   so selectors must match .inscribe-diff-new.markdown-rendered (same element),
+   not a descendant. */
+.inscribe-diff-new.markdown-rendered,
 .inscribe-diff-new .markdown-rendered {
     line-height: var(--line-height-normal, 1.5);
 }
+.inscribe-diff-new.markdown-rendered ol,
+.inscribe-diff-new.markdown-rendered ul,
 .inscribe-diff-new .markdown-rendered ol,
 .inscribe-diff-new .markdown-rendered ul {
     margin: 0;
     padding-inline-start: 1.1em;
 }
+.inscribe-diff-new.markdown-rendered li,
 .inscribe-diff-new .markdown-rendered li {
     margin: 0;
     padding: 0;
 }
+.inscribe-diff-new.markdown-rendered li > p,
+.inscribe-diff-new.markdown-rendered p,
 .inscribe-diff-new .markdown-rendered li > p,
 .inscribe-diff-new .markdown-rendered p {
     margin: 0;
 }
+.inscribe-diff-new.markdown-rendered h1,
+.inscribe-diff-new.markdown-rendered h2,
+.inscribe-diff-new.markdown-rendered h3,
+.inscribe-diff-new.markdown-rendered h4,
+.inscribe-diff-new.markdown-rendered h5,
+.inscribe-diff-new.markdown-rendered h6,
 .inscribe-diff-new .markdown-rendered h1,
 .inscribe-diff-new .markdown-rendered h2,
 .inscribe-diff-new .markdown-rendered h3,
