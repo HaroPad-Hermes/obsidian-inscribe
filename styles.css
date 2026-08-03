@@ -224,12 +224,14 @@
 .inscribe-diff-list {
     display: block;
     margin: 0;
-    position: relative;
-    padding-left: var(--list-indent, 2em);
+    /* tight hanging indent: marker zone ≈ tabular "10." + the source space.
+       Wrapped lines align just past the marker, like the accepted text. */
+    padding-left: 1.1em;
+    text-indent: -1.1em;
 }
 .inscribe-diff-marker {
-    position: absolute;
-    left: 0;
-    top: 0;
+    display: inline-block;
+    min-width: 1.1em;
+    font-variant-numeric: tabular-nums;
     color: var(--list-marker-color, var(--text-faint));
 }
