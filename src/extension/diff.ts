@@ -22,14 +22,14 @@ class DiffTextWidget extends WidgetType {
     }
 
     toDOM() {
-        // BLOCK element, not inline: an inline widget can only lay out within
-        // its own line box, so multi-line rewrites get squeezed/staggered
-        // across the replaced lines. A block widget owns the whole replaced
-        // range and renders the line structure correctly.
-        const div = document.createElement("div");
-        div.className = "inscribe-diff-new";
-        div.textContent = this.text;
-        return div;
+        // INLINE element — a block element here makes CM6 treat the widget as
+        // a block widget, which is ILLEGAL from a StateField decorations
+        // provider ("Block decorations may not be specified via plugins") and
+        // throws inside the view update, breaking the whole editor.
+        const span = document.createElement("span");
+        span.className = "inscribe-diff-new";
+        span.textContent = this.text;
+        return span;
     }
 
     ignoreEvent() {
@@ -92,18 +92,36 @@ export const diffSessionState = StateField.define<DiffSession | null>({
         return value;
     },
     provide: (field) =>
-        EditorView.decorations.from(field, (session): DecorationSet => {
+        EditorView.decorations.from(field, (session, view): DecorationSet => {
             if (!session) return Decoration.none;
-            const decos = [
-                Decoration.widget({ widget: new DiffTextWidget(session.rewritten), side: -1 }).range(session.from),
-                // Replace decorations cannot be zero-length (CM6 throws
-                // "Invalid range"); generate sessions insert at the cursor
-                // (from === to) with nothing to hide.
-                ...(session.to > session.from
-                    ? [Decoration.replace({ inclusive: false }).range(session.from, session.to)]
-                    : []),
-                Decoration.widget({ widget: new DiffButtonsWidget(session), side: 1 }).range(session.to),
-            ];
+            const decos: Array<import("@codemirror/state").Range<Decoration>> = [];
+            // Per-line widgets: each line of the rewritten text renders at the
+            // start of the corresponding original line. A single inline widget
+            // cannot lay out across replaced lines (it squeezes/staggers), and
+            // a block widget is illegal from a decorations provider — so one
+            // inline widget per line is the legal way to show multi-line text.
+            const fromLine = view.state.doc.lineAt(session.from);
+            const toLine = view.state.doc.lineAt(session.to);
+            const origLineCount = toLine.number - fromLine.number + 1;
+            const newLines = session.rewritten.split("\n");
+            for (let i = 0; i < origLineCount; i++) {
+                const text = newLines[i];
+                if (text === undefined) break; // fewer new lines than original lines
+                const pos = i === 0 ? session.from : view.state.doc.line(fromLine.number + i).from;
+                decos.push(Decoration.widget({ widget: new DiffTextWidget(text), side: -1 }).range(pos));
+            }
+            // Extra new lines beyond the original range: trailing widget.
+            if (newLines.length > origLineCount) {
+                const extra = newLines.slice(origLineCount).join("\n");
+                if (extra) decos.push(Decoration.widget({ widget: new DiffTextWidget(extra), side: 1 }).range(session.to));
+            }
+            // Replace decorations cannot be zero-length (CM6 throws
+            // "Invalid range"); generate sessions insert at the cursor
+            // (from === to) with nothing to hide.
+            if (session.to > session.from) {
+                decos.push(Decoration.replace({ inclusive: false }).range(session.from, session.to));
+            }
+            decos.push(Decoration.widget({ widget: new DiffButtonsWidget(session), side: 1 }).range(session.to));
             // RangeSetBuilder requires ranges sorted by (from, startSide);
             // startSide exists at runtime but is untyped on Range.
             const sideOf = (r: { from: number; startSide?: number }) => r.startSide ?? 0;
