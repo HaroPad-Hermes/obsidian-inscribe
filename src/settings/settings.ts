@@ -167,7 +167,7 @@ export const DEFAULT_SETTINGS: Settings = {
             completionOptions: {
                 model: "deepseek-v4-flash",
                 userPrompt: 'If the last sentence is incomplete, only complete the sentence and nothing else. If the last sentence is complete, generate a new sentence that follows logically:\n---\n{{{pre_cursor}}}',
-                systemPrompt: "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing. Continue ONLY the very last word or sentence at the end of the text. Never complete or re-emit earlier sentences, list items, or text that already exists above. Write in Markdown, matching the surrounding structure (a heading stays a heading, a paragraph stays a paragraph).",
+                systemPrompt: "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing. Continue ONLY the very last word or sentence at the end of the text. Never complete or re-emit earlier sentences, list items, or text that already exists above. Write in Markdown, matching the surrounding structure — always start a new line after a heading (## ...) before body text.",
                 temperature: 0.5,
                 twoPromptFlow: true,
                 wordCheckTokens: 5,

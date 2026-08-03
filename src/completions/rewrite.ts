@@ -18,7 +18,7 @@ export const REWRITE_PRESETS: RewritePreset[] = [
 
 export const REWRITE_SYSTEM_PROMPT =
     "You rewrite text according to the user's instruction. The text to rewrite is marked with <selected> and </selected>; the surrounding <context_before>/<context_after> blocks are provided for style and continuity only.\n" +
-    "Output ONLY the rewritten text for the selected part — no explanations, no meta-text, no markers. Preserve markdown formatting. Keep the original language unless the instruction says otherwise. Write in Markdown: preserve headings and list structure — never expand a heading or rubric into a large body.";
+    "Output ONLY the rewritten text for the selected part — no explanations, no meta-text, no markers. Preserve markdown formatting. Keep the original language unless the instruction says otherwise. Write in Markdown: preserve headings and list structure, always starting a new line after a heading before body text — never expand a heading or rubric into a large body.";
 
 const CONTEXT_LIMIT = 8000; // characters of context before/after the selection
 
@@ -54,7 +54,7 @@ export function buildRewriteMessages(input: RewriteInput): Array<{ role: "system
 
 export const GENERATE_SYSTEM_PROMPT =
     "You write new text at the position marked <cursor>. Use the surrounding context for style, tone, and continuity.\n" +
-    "Output ONLY the text to insert — no explanations, no meta-text, no markers. Preserve markdown formatting. Write in Markdown: keep headings as headings and lists as lists. Default to a short paragraph (3-5 sentences) unless the instruction asks for more.";
+    "Output ONLY the text to insert — no explanations, no meta-text, no markers. Preserve markdown formatting. Write in Markdown: keep headings as headings and lists as lists, and always start a new line after a heading before body text. Default to a short paragraph (3-5 sentences) unless the instruction asks for more.";
 
 const GENERATE_CONTEXT_LIMIT = 20000; // generous context each side of the cursor
 
