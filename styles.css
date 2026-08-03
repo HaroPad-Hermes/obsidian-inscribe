@@ -220,3 +220,32 @@
     background-color: hsla(var(--color-accent-hsl), 0.33) !important;
 }
 
+
+/* ── Compress the rendered markdown inside the diff preview ──
+   The rendered view adds ~4x list spacing, a large ol indent, and heading
+   margins vs Live Preview. Match the editor's tight geometry so the ghost
+   looks like the accepted text. */
+.inscribe-diff-new .markdown-rendered {
+    line-height: var(--line-height-normal, 1.5);
+}
+.inscribe-diff-new .markdown-rendered ol,
+.inscribe-diff-new .markdown-rendered ul {
+    margin: 0;
+    padding-inline-start: 1.1em;
+}
+.inscribe-diff-new .markdown-rendered li {
+    margin: 0;
+    padding: 0;
+}
+.inscribe-diff-new .markdown-rendered li > p,
+.inscribe-diff-new .markdown-rendered p {
+    margin: 0;
+}
+.inscribe-diff-new .markdown-rendered h1,
+.inscribe-diff-new .markdown-rendered h2,
+.inscribe-diff-new .markdown-rendered h3,
+.inscribe-diff-new .markdown-rendered h4,
+.inscribe-diff-new .markdown-rendered h5,
+.inscribe-diff-new .markdown-rendered h6 {
+    margin: 0;
+}
