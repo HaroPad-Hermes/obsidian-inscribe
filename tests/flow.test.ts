@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom, WORD_VALIDITY_SYSTEM, continuationWindow } from "../src/completions/flow";
+import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom, WORD_VALIDITY_SYSTEM, continuationWindow, normalizeListLineBreaks } from "../src/completions/flow";
 
 const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
 
@@ -226,6 +226,22 @@ describe("computeGhost — markdown stripping", () => {
     });
 });
 
+
+describe("normalizeListLineBreaks", () => {
+    it("breaks run-on numbered lists after sentence-ending punctuation", () => {
+        expect(normalizeListLineBreaks("outdoors. 2. Don't forget your umbrella. 3. It rains."))
+            .toBe("outdoors.\n2. Don't forget your umbrella.\n3. It rains.");
+    });
+
+    it("does not touch decimals or section references", () => {
+        expect(normalizeListLineBreaks("The value is 3.1 and section 5. The result follows."))
+            .toBe("The value is 3.1 and section 5. The result follows.");
+    });
+
+    it("leaves already-broken lists alone", () => {
+        expect(normalizeListLineBreaks("one.\n2. two\n3. three")).toBe("one.\n2. two\n3. three");
+    });
+});
 
 describe("computeGhost raw continuation argument (FIM)", () => {
     it("passes the windowed raw prefix as the second argument", async () => {

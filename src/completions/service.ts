@@ -7,6 +7,7 @@ import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provid
 import preparePrompt from "src/completions/prompt";
 import { buildSystemPromptFrom, computeGhost, WORD_VALIDITY_SYSTEM } from "src/completions/flow";
 import { buildRewriteMessages, buildGenerateMessages } from "src/completions/rewrite";
+import { normalizeListLineBreaks } from "src/completions/flow";
 import { DiffSession } from "src/extension/diff";
 import { isVimEnabled, isVimInsertMode } from "src/completions/vim";
 import nlp from "compromise";
@@ -209,7 +210,7 @@ export default class CompletionService {
                 temperature: 0.5,
                 thinking: thinking ? "enabled" : "disabled",
             });
-            const rewritten = (result || "").trim();
+            const rewritten = normalizeListLineBreaks((result || "").trim());
             if (!rewritten) {
                 new Notice("Inscribe: the model returned nothing");
                 return null;
@@ -252,7 +253,7 @@ export default class CompletionService {
                 temperature: 0.7,
                 thinking: thinking ? "enabled" : "disabled",
             });
-            const generated = (result || "").trim();
+            const generated = normalizeListLineBreaks((result || "").trim());
             if (!generated) {
                 new Notice("Inscribe: the model returned nothing");
                 return null;

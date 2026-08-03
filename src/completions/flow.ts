@@ -128,6 +128,15 @@ export function continuationWindow(text: string, maxLines = 2, maxLineChars = 60
         .join("\n");
 }
 
+// Models often emit numbered lists as one run-on line ("... outdoors. 2. Don't
+// ..."). Markdown needs each item on its own line — normalize sentence-end +
+// "N. " into a line break. Code-decided geometry: the model's content is kept,
+// only the line structure is fixed. Safe for decimals ("3.1"), ranges
+// ("section 5. The"), and already-broken lists.
+export function normalizeListLineBreaks(text: string): string {
+    return text.replace(/([.!?])\s+(?=\d+\.\s)/g, "$1\n");
+}
+
 export async function computeGhost(
     text: string,
     systemPrompt: string,
@@ -135,7 +144,7 @@ export async function computeGhost(
     options: GhostOptions = {}
 ): Promise<string | null> {
     const clean = (s: string): string =>
-        trimLeading(trimTrailing(limitSentences(collapseSpaces(stripMarkdown(s)), options.maxSentences)));
+        normalizeListLineBreaks(trimLeading(trimTrailing(limitSentences(collapseSpaces(stripMarkdown(s)), options.maxSentences))));
 
     // Case 1: trailing space or empty text — word boundary is unambiguous.
     if (text.endsWith(' ') || text.length === 0) {
