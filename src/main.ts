@@ -32,12 +32,17 @@ export default class Inscribe extends Plugin {
 	refreshArbiterServer() {
 		const a = this.settings.arbiter;
 		if (a.manageServer) {
-			this.arbiterServer.ensureRunning({
-				manageServer: true,
-				baseUrl: a.baseUrl,
-				modelFile: a.modelFile,
-				serverDir: this.manifest.dir ?? join(this.manifest.basePath, this.manifest.id, 'server'),
-			}).catch((e) => console.error("Inscribe: arbiter server start failed", e));
+			const serverDir = this.manifest.dir ? join(this.manifest.dir, 'server') : '';
+			if (!serverDir) {
+				console.error("Inscribe: plugin dir unknown — cannot manage arbiter server");
+			} else {
+				this.arbiterServer.ensureRunning({
+					manageServer: true,
+					baseUrl: a.baseUrl,
+					modelFile: a.modelFile,
+					serverDir,
+				}).catch((e) => console.error("Inscribe: arbiter server start failed", e));
+			}
 		} else {
 			this.arbiterServer.stop();
 		}
