@@ -69,6 +69,32 @@ async function chat(system: string, user: string, maxTokens: number, temperature
     return d.choices[0].message.content ?? "";
 }
 
+// Plausible-word check endpoint override: set BATTERY_CHECK_URL to run the
+// spacing-arbiter checks against a LOCAL model (llama-server/LM Studio)
+// instead of the DeepSeek API — the Phase-4 acceptance gate.
+const CHECK_URL = process.env.BATTERY_CHECK_URL ?? null;
+const CHECK_MODEL = process.env.BATTERY_CHECK_MODEL ?? "arbiter";
+
+async function checkChat(system: string, user: string): Promise<string> {
+    if (CHECK_URL) {
+        const res = await fetch(`${CHECK_URL}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: CHECK_MODEL,
+                messages: [{ role: "system", content: system }, { role: "user", content: user }],
+                max_tokens: 128,
+                temperature: 0,
+                stream: false,
+            }),
+        });
+        if (!res.ok) throw new Error(`CHECK HTTP ${res.status}: ${await res.text()}`);
+        const d = (await res.json()) as any;
+        return d.choices?.[0]?.message?.content ?? "";
+    }
+    return chat(system, user, 5, 0.1);
+}
+
 // FIM: raw completion with a suffix anchor (the plugin's DeepSeek path).
 async function fim(prompt: string, suffix: string, maxTokens: number, temperature: number): Promise<string> {
     const res = await fetch("https://api.deepseek.com/beta/completions", {
@@ -162,7 +188,7 @@ async function runCase(c: Case): Promise<CaseResult> {
         },
         isPlausibleWord: async (text, candidate) => {
             checkUsed = true;
-            const r = (await chat(WORD_VALIDITY_SYSTEM, `Text: "${text}"\nIs "${candidate}" a plausible word to write here?`, 5, 0.1)).trim().toUpperCase();
+            const r = (await checkChat(WORD_VALIDITY_SYSTEM, `Text: "${text}"\nIs "${candidate}" a plausible word to write here?`)).trim().toUpperCase();
             checkVerdict = r.startsWith("YES");
             return checkVerdict;
         },
@@ -177,7 +203,7 @@ it("judgment battery (prints report — judge manually)", async () => {
         return;
     }
     const started = Date.now();
-    console.log(`\nBattery against deepseek-v4-flash — ${CASES.length} cases (${PARALLEL ? `parallel ×${CONCURRENCY}` : "sequential"}) + design experiment\n`);
+    console.log(`\nBattery against deepseek-v4-flash — ${CASES.length} cases (${PARALLEL ? `parallel ×${CONCURRENCY}` : "sequential"}) + design experiment${CHECK_URL ? ` | plausible-word check: LOCAL (${CHECK_URL})` : " | plausible-word check: deepseek-v4-flash"}\n`);
     let results: CaseResult[];
     if (PARALLEL) {
         results = await mapLimit(CASES, CONCURRENCY, runCase);

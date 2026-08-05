@@ -272,6 +272,45 @@ class SuggestionControlSection {
 
         new Setting(this.container)
             .setHeading()
+            .setName("Spacing check")
+            .setDesc("The local fine-tuned model decides whether the continuation attaches to the last word or starts a new word. Auto: local model first, provider API on failure. Requires the local llama-server on the configured port (or any OpenAI-compatible endpoint).")
+
+        new Setting(this.container)
+            .setName("Arbiter routing")
+            .addDropdown((dd) => {
+                dd.addOption("auto", "Auto (local, API fallback)")
+                    .addOption("local", "Local only")
+                    .addOption("api", "API only")
+                    .setValue(this.plugin.settings.arbiter.mode)
+                    .onChange(async (value) => {
+                        this.plugin.settings.arbiter.mode = value as any;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(this.container)
+            .setName("Local endpoint")
+            .setDesc("OpenAI-compatible base URL of the local arbiter server")
+            .addText((text) => {
+                text.setValue(this.plugin.settings.arbiter.baseUrl)
+                    .onChange(async (value) => {
+                        this.plugin.settings.arbiter.baseUrl = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(this.container)
+            .setName("Local model id")
+            .addText((text) => {
+                text.setValue(this.plugin.settings.arbiter.model)
+                    .onChange(async (value) => {
+                        this.plugin.settings.arbiter.model = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(this.container)
+            .setHeading()
             .setName("Auto trigger rules")
             .setDesc("Configure rules for when suggestions should be automatically triggered. Rules are skipped if manual activation is enabled.")
 

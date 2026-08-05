@@ -67,6 +67,40 @@ export default class CompletionService {
         return this.settings.enabled && this.profileService.getActivePathConfig().enabled;
     }
 
+    // Local spacing arbiter: OpenAI-compatible call to the fine-tuned model
+    // (llama-server --reasoning off). Returns "YES"/"NO", or null on any
+    // failure so the caller can fall back to the provider API.
+    private async localPlausibleWord(system: string, user: string): Promise<string | null> {
+        const { baseUrl, model, timeoutMs } = this.settings.arbiter;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model,
+                    messages: [{ role: "system", content: system }, { role: "user", content: user }],
+                    max_tokens: 128,
+                    temperature: 0,
+                    stream: false,
+                }),
+                signal: controller.signal,
+            });
+            if (!res.ok) return null;
+            const d = (await res.json()) as any;
+            const content: string | undefined = d?.choices?.[0]?.message?.content;
+            if (!content) return null;
+            const t = content.trim().toUpperCase();
+            return t.startsWith("YES") ? "YES" : t.startsWith("NO") ? "NO" : null;
+        } catch (error) {
+            console.error("Inscribe: local arbiter failed", error);
+            return null;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
     private notifyCompletionStatus(isGenerating: boolean) {
         for (const listener of this.completionStatusListeners) {
             listener(isGenerating);
@@ -157,8 +191,17 @@ export default class CompletionService {
                     { maxTokens: options.continuationTokens, temperature: options.temperature });
             },
             isPlausibleWord: async (text, candidate) => {
+                const user = `Text: "${text}"\nIs "${candidate}" a plausible word to write here?`;
+                // Local spacing arbiter (fine-tuned Qwen3.5-2B on llama-server
+                // with --reasoning off): deterministic, ~50-80ms. Falls back to
+                // the active provider's API in "auto" mode.
+                if (this.settings.arbiter.mode !== "api") {
+                    const local = await this.localPlausibleWord(WORD_VALIDITY_SYSTEM, user);
+                    if (local !== null) return local === "YES";
+                    if (this.settings.arbiter.mode === "local") return null;
+                }
                 const r = await generate(
-                    [{ role: 'system', content: WORD_VALIDITY_SYSTEM }, { role: 'user', content: `Text: "${text}"\nIs "${candidate}" a plausible word to write here?` }],
+                    [{ role: 'system', content: WORD_VALIDITY_SYSTEM }, { role: 'user', content: user }],
                     { maxTokens: 5, temperature: 0.1 });
                 if (r === null) return null;
                 return r.trim().toUpperCase().startsWith("YES");

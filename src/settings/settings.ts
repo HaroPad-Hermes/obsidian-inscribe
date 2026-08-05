@@ -33,6 +33,19 @@ export type Path = string;
 export type PathConfig = { profile: ProfileId, enabled: boolean };
 export type SelectionMenuPlacement = "smart" | "centered" | "first";
 export type SelectionMenuSide = "below" | "above";
+export type ArbiterMode = "auto" | "local" | "api";
+
+export type ArbiterSettings = {
+    // Spacing-arbiter routing: "auto" = local model first, API fallback;
+    // "local" = local only (null on failure); "api" = provider API only.
+    mode: ArbiterMode,
+    // OpenAI-compatible local endpoint (llama-server --reasoning off).
+    baseUrl: string,
+    // Model id sent to the local endpoint (llama-server ignores it).
+    model: string,
+    // Per-call timeout for the local arbiter (ms).
+    timeoutMs: number,
+}
 
 export type SuggestionControl = {
     // One-click plate-editor-style setup (Tab dual-role + word split)
@@ -70,6 +83,8 @@ export interface Settings {
     enabled: boolean,
     // settings for controlling suggestions
     suggestionControl: SuggestionControl,
+    // local spacing-arbiter routing (fine-tuned Qwen3.5-2B)
+    arbiter: ArbiterSettings,
     // available providers
     providers: {
         ollama: OllamaSettings,
@@ -88,6 +103,12 @@ export const DEFAULT_PROFILE: ProfileId = "default";
 export const DEFAULT_PATH = "/";
 export const DEFAULT_SETTINGS: Settings = {
     enabled: false,
+    arbiter: {
+        mode: "auto",
+        baseUrl: "http://127.0.0.1:8099",
+        model: "qwen35-2b-arbiter-v4",
+        timeoutMs: 10000,
+    },
     suggestionControl: {
         plateMode: false,
         acceptanceHotkey: "Tab",
