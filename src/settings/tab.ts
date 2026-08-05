@@ -310,6 +310,30 @@ class SuggestionControlSection {
             });
 
         new Setting(this.container)
+            .setName("Manage server lifecycle")
+            .setDesc("Start the bundled llama-server when Obsidian opens and stop it when Obsidian closes. Uses the server/ folder next to the plugin; skipped if a server is already running on the endpoint.")
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.plugin.settings.arbiter.manageServer)
+                    .onChange(async (value) => {
+                        this.plugin.settings.arbiter.manageServer = value;
+                        await this.plugin.saveSettings();
+                        this.plugin.refreshArbiterServer();
+                    });
+            });
+
+        new Setting(this.container)
+            .setName("Model file")
+            .setDesc("GGUF filename inside the plugin's server/ directory")
+            .addText((text) => {
+                text.setValue(this.plugin.settings.arbiter.modelFile)
+                    .onChange(async (value) => {
+                        this.plugin.settings.arbiter.modelFile = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(this.container)
             .setName("FIM short-fill fallback")
             .setDesc("If the FIM continuation ends mid-phrase (a bare determiner/conjunction/preposition) or is empty, re-run via chat for a full sentence. Skipped inside code blocks.")
             .addToggle((toggle) => {

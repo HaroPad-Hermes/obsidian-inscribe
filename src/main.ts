@@ -13,6 +13,8 @@ import { PromptModal } from './settings/prompt-modal';
 import { RewriteModal } from './settings/rewrite-modal';
 import { GenerateModal } from './settings/generate-modal';
 import { deepMerge } from './settings/load';
+import { ArbiterServerManager } from './server-manager';
+import { join } from 'path';
 
 export default class Inscribe extends Plugin {
 	settings!: Settings;
@@ -21,6 +23,25 @@ export default class Inscribe extends Plugin {
 
 	private profileService!: ProfileService;
 	private completionService!: CompletionService;
+	private arbiterServer = new ArbiterServerManager();
+
+	// (Re)start or stop the bundled llama-server per the arbiter settings.
+	// Called on load and whenever the user toggles manageServer / edits the
+	// model file. Safe to call repeatedly — the manager no-ops when the
+	// server is already healthy or management is disabled.
+	refreshArbiterServer() {
+		const a = this.settings.arbiter;
+		if (a.manageServer) {
+			this.arbiterServer.ensureRunning({
+				manageServer: true,
+				baseUrl: a.baseUrl,
+				modelFile: a.modelFile,
+				serverDir: this.manifest.dir ?? join(this.manifest.basePath, this.manifest.id, 'server'),
+			}).catch((e) => console.error("Inscribe: arbiter server start failed", e));
+		} else {
+			this.arbiterServer.stop();
+		}
+	}
 
 	async onload() {
 		await this.loadSettings();
@@ -31,6 +52,9 @@ export default class Inscribe extends Plugin {
 		this.statusBarItem = new StatusBarItem(this, this.profileService, this.completionService);
 
 		this.addSettingTab(new InscribeSettingsTab(this));
+
+		// Spawn the local spacing-arbiter server (if managed + not already up).
+		this.refreshArbiterServer();
 
 		this.addCommand({
 			id: "edit-document-prompt",
@@ -119,5 +143,9 @@ export default class Inscribe extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.providerFactory.rebuildProviders();
+	}
+
+	onunload() {
+		this.arbiterServer.stop();
 	}
 }

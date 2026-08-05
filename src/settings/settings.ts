@@ -45,6 +45,10 @@ export type ArbiterSettings = {
     model: string,
     // Per-call timeout for the local arbiter (ms).
     timeoutMs: number,
+    // Spawn/kill the bundled llama-server with the plugin lifecycle.
+    manageServer: boolean,
+    // GGUF filename inside the plugin's server/ directory.
+    modelFile: string,
 }
 
 export type SuggestionControl = {
@@ -111,6 +115,8 @@ export const DEFAULT_SETTINGS: Settings = {
         baseUrl: "http://127.0.0.1:8099",
         model: "qwen35-2b-arbiter-v4",
         timeoutMs: 10000,
+        manageServer: true,
+        modelFile: "qwen35-2b-arbiter-v4-q4_k_m.gguf",
     },
     suggestionControl: {
         plateMode: false,
