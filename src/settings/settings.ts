@@ -68,6 +68,9 @@ export type SuggestionControl = {
         enabled: boolean,
         sentences: number,
     },
+    // Re-run FIM continuations that end in a stranded unit (bare determiner /
+    // conjunction / preposition) or are empty through the chat path instead.
+    fimShortFillFallback: boolean,
     // Rules that determine when suggestions should auto-trigger
     activationRules: {
         // Require the current line to be non-empty
@@ -121,6 +124,7 @@ export const DEFAULT_SETTINGS: Settings = {
             enabled: true,
             sentences: 1,
         },
+        fimShortFillFallback: true,
         delayMs: 500,
         activationRules: {
             requireNonEmptyLine: true,

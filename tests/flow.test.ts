@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom, WORD_VALIDITY_SYSTEM, continuationWindow, normalizeListLineBreaks } from "../src/completions/flow";
+import { computeGhost, stripMarkdown, isStuckMarker, limitSentences, buildSystemPromptFrom, WORD_VALIDITY_SYSTEM, continuationWindow, normalizeListLineBreaks, isIncompleteFill } from "../src/completions/flow";
 
 const SYS = "You are an AI autocomplete engine. Output only the continuation text. No explanations, no meta-text. Never repeat words already in the text. If you cannot continue meaningfully, output nothing.";
 
@@ -11,6 +11,35 @@ function flow(text: string, plausible: boolean | null, cont: string | null, maxS
         isPlausibleWord: async () => plausible,
     }, maxSentences !== undefined ? { maxSentences } : undefined);
 }
+
+describe("isIncompleteFill — FIM short-fill fallback rule", () => {
+    it("flags empty fills", () => {
+        expect(isIncompleteFill("")).toBe(true);
+        expect(isIncompleteFill("   ")).toBe(true);
+    });
+    it("flags bare determiners (the reported 'the' case)", () => {
+        expect(isIncompleteFill("the")).toBe(true);
+        expect(isIncompleteFill("a")).toBe(true);
+    });
+    it("flags conjunctions and prepositions", () => {
+        expect(isIncompleteFill("and")).toBe(true);
+        expect(isIncompleteFill("of")).toBe(true);
+        expect(isIncompleteFill("until")).toBe(true);
+        expect(isIncompleteFill("with")).toBe(true);
+    });
+    it("keeps clause-complete fills", () => {
+        expect(isIncompleteFill("the power went out.")).toBe(false);
+        expect(isIncompleteFill("the fire alarm suddenly went off.")).toBe(false);
+    });
+    it("keeps noun-phrase fills (complete units)", () => {
+        expect(isIncompleteFill("the researcher")).toBe(false);
+        expect(isIncompleteFill("the technician")).toBe(false);
+    });
+    it("keeps code closures untouched", () => {
+        expect(isIncompleteFill(");")).toBe(false);
+        expect(isIncompleteFill("}")).toBe(false);
+    });
+});
 
 describe("computeGhost — spacing rules (plausible-word check)", () => {
     it("new word after a complete word → leading space (Loremipsum is not a word)", async () => {

@@ -5,7 +5,7 @@ import { Suggestion } from "src/extension";
 import { ProfileOptions, Settings } from "src/settings/settings";
 import { Provider, ChatMessage, GenerateOnceOptions } from "src/providers/provider";
 import preparePrompt from "src/completions/prompt";
-import { buildSystemPromptFrom, computeGhost, WORD_VALIDITY_SYSTEM } from "src/completions/flow";
+import { buildSystemPromptFrom, computeGhost, WORD_VALIDITY_SYSTEM, isIncompleteFill } from "src/completions/flow";
 import { buildRewriteMessages, buildGenerateMessages } from "src/completions/rewrite";
 import { normalizeListLineBreaks } from "src/completions/flow";
 import { DiffSession } from "src/extension/diff";
@@ -180,11 +180,25 @@ export default class CompletionService {
                     }
                 }
                 if (fimTried && fimResult !== null) {
-                    if (moved()) {
-                        await provider.abort();
-                        return null;
+                    // FIM fills are boundary-sized: an empty or stranded-unit
+                    // fill ("the", "and") leaves the sentence hanging — re-run
+                    // via chat to get a real continuation. Skipped inside code
+                    // blocks, where short fills are legitimate.
+                    const inCode = raw !== undefined && raw.includes("```");
+                    if (
+                        this.settings.suggestionControl.fimShortFillFallback &&
+                        !inCode &&
+                        isIncompleteFill(fimResult)
+                    ) {
+                        console.error("Inscribe: FIM fill incomplete — falling back to chat path");
+                        fimResult = null;
+                    } else {
+                        if (moved()) {
+                            await provider.abort();
+                            return null;
+                        }
+                        return fimResult;
                     }
-                    return fimResult;
                 }
                 return generate(
                     [{ role: 'system', content: system }, { role: 'user', content: p }],

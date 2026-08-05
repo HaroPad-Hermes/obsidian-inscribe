@@ -30,6 +30,25 @@ export function limitSentences(s: string, max?: number): string {
     return sentences.slice(0, max).join(" ").trimEnd();
 }
 
+// FIM fills are sized to satisfy the local boundary, not the sentence: a bare
+// determiner/conjunction/preposition ("the", "and", "of") or an empty fill is
+// a stranded unit that leaves the sentence hanging. Clause-closing punctuation
+// marks a complete unit ("the power went out.", ");", "}").
+const CLOSED_CLASS_TAGS = new Set([
+    "Determiner", "Conjunction", "Preposition", "Pronoun", "QuestionWord",
+    "Modal", "Auxiliary", "Copula", "Possessive",
+]);
+const CLAUSE_CLOSING_RE = /[.!?;:,\])}]\s*$/;
+
+export function isIncompleteFill(fill: string): boolean {
+    const t = fill.trim();
+    if (!t) return true; // empty fill → let the chat path try
+    if (CLAUSE_CLOSING_RE.test(t)) return false; // complete clause / code unit
+    const last = nlp(t).terms().last();
+    const tags = (last.json({ terms: { tags: true } })[0]?.terms?.[0]?.tags ?? []) as string[];
+    return tags.some((tag) => CLOSED_CLASS_TAGS.has(tag));
+}
+
 // Build the effective system prompt from note frontmatter:
 //  - `ai-prompt`  replaces the profile prompt entirely (always honored)
 //  - `ai-context` appends DOCUMENT CONTEXT (gated by the aiContext toggle)

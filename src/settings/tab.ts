@@ -310,6 +310,18 @@ class SuggestionControlSection {
             });
 
         new Setting(this.container)
+            .setName("FIM short-fill fallback")
+            .setDesc("If the FIM continuation ends mid-phrase (a bare determiner/conjunction/preposition) or is empty, re-run via chat for a full sentence. Skipped inside code blocks.")
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.plugin.settings.suggestionControl.fimShortFillFallback)
+                    .onChange(async (value) => {
+                        this.plugin.settings.suggestionControl.fimShortFillFallback = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(this.container)
             .setHeading()
             .setName("Auto trigger rules")
             .setDesc("Configure rules for when suggestions should be automatically triggered. Rules are skipped if manual activation is enabled.")
