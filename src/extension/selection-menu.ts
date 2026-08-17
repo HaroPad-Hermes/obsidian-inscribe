@@ -2,7 +2,19 @@
 // selection bar): preset rewrite buttons + an "Ask AI anything…" input + a
 // thinking toggle. On action it calls the injected runner; the caller decides
 // what to do with the result (dispatch the inline diff).
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+//
+// The menu is rendered through CM6's TOOLTIP system (the `showTooltip`
+// facet) — the supported mechanism for floating UI anchored to a document
+// position. The tooltip layer re-measures on scroll/resize and re-derives
+// the anchor via the TooltipView `getCoords` hook, so the bar is glued to
+// the document and scrolls with it natively; it is hidden automatically
+// when the selection scrolls out of the editor and reappears when it
+// scrolls back in. Raw DOM appended to .cm-content/.cm-scroller is not
+// managed by CM6 and gets removed or pinned to the visible box — both were
+// tried and failed before this rewrite.
+import { StateEffect, StateField } from "@codemirror/state";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, showTooltip, tooltips } from "@codemirror/view";
+import type { Rect, Tooltip, TooltipView } from "@codemirror/view";
 import { setIcon, setTooltip } from "obsidian";
 import { REWRITE_PRESETS } from "src/completions/rewrite";
 import { diffSessionState } from "./diff";
@@ -80,20 +92,210 @@ const PRESET_ICONS: Record<string, string> = {
     latex: "sigma",
 };
 
+// What the menu needs while it is open. The getters are stable references to
+// the live settings (placement/side/pull-in are re-read on every measure, so
+// setting changes apply immediately), and `plugin` carries the runner +
+// thinking state.
+interface SelectionMenuSpec {
+    from: number;
+    to: number;
+    plugin: SelectionMenuHost;
+    getPlacement: () => SelectionMenuPlacement;
+    getSide: () => SelectionMenuSide;
+    getPullIn: () => boolean;
+    getGap: () => number;
+}
+
+interface SelectionMenuHost {
+    thinking: boolean;
+    currentMenu: HTMLElement | null;
+    menuOpen: boolean;
+    run(instruction: string, thinking: boolean): Promise<boolean>;
+    hide(): void;
+}
+
+// The open menu, as a tooltip spec (null = hidden). Changing the value adds
+// or removes the tooltip from the editor state.
+const setSelectionMenuTooltip = StateEffect.define<SelectionMenuSpec | null>();
+
+const selectionMenuTooltipField = StateField.define<SelectionMenuSpec | null>({
+    create: () => null,
+    update(value, tr) {
+        for (const e of tr.effects) {
+            if (e.is(setSelectionMenuTooltip)) return e.value;
+        }
+        return value;
+    },
+    provide: (f) => showTooltip.from(f, (spec) => (spec ? tooltipFor(spec) : null)),
+});
+
+function tooltipFor(spec: SelectionMenuSpec): Tooltip {
+    return {
+        pos: spec.from,
+        end: spec.to,
+        above: spec.getSide() === "above",
+        // strictSide defaults to false: the layer flips the bar to the other
+        // side when the chosen one has no room, re-evaluating on every
+        // scroll. (The vertical math in computeMenuPosition is kept for the
+        // horizontal anchor + pull-in only.)
+        create: (view) => buildMenuTooltipView(spec, view),
+    };
+}
+
+function buildMenuTooltipView(spec: SelectionMenuSpec, view: EditorView): TooltipView {
+    const host = spec.plugin;
+    const menu = document.createElement("div");
+    menu.className = "inscribe-selection-menu";
+    menu.addEventListener("mousedown", (e) => e.preventDefault()); // keep the selection
+
+    for (const preset of REWRITE_PRESETS) {
+        const btn = document.createElement("button");
+        btn.className = "inscribe-selection-btn";
+        setIcon(btn, PRESET_ICONS[preset.id] ?? "sparkles");
+        setTooltip(btn, preset.label, { placement: "top" });
+        btn.addEventListener("click", () => {
+            void host.run(preset.instruction, host.thinking).then((ok) => {
+                if (ok) host.hide();
+            });
+        });
+        menu.append(btn);
+    }
+
+    const divider = document.createElement("span");
+    divider.className = "inscribe-selection-divider";
+    menu.append(divider);
+
+    const input = document.createElement("input");
+    input.className = "inscribe-selection-input";
+    input.type = "text";
+    input.placeholder = "Ask AI anything…";
+    input.addEventListener("mousedown", (e) => e.stopPropagation());
+    input.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+            const value = input.value.trim();
+            if (value) {
+                void host.run(value, host.thinking).then((ok) => {
+                    if (ok) host.hide();
+                });
+                input.value = "";
+            }
+        }
+    });
+    menu.append(input);
+    menu.append(divider.cloneNode(true));
+    const think = document.createElement("button");
+    think.className = "inscribe-selection-btn";
+    setIcon(think, "brain");
+    think.classList.toggle("is-active", host.thinking);
+    setTooltip(think, `Thinking: ${host.thinking ? "on" : "off"}`, { placement: "top" });
+    think.addEventListener("click", () => {
+        host.thinking = !host.thinking;
+        think.classList.toggle("is-active", host.thinking);
+        setTooltip(think, `Thinking: ${host.thinking ? "on" : "off"}`, { placement: "top" });
+    });
+    menu.append(think);
+
+    host.currentMenu = menu;
+    host.menuOpen = true;
+    document.body.classList.add("inscribe-menu-open");
+
+    return {
+        dom: menu,
+        // Vertical gap between the selection and the bar (live setting — the
+        // layer reads `offset` on every measure, so changes apply without a
+        // restart and on both the below and above sides).
+        get offset() {
+            return { x: 0, y: spec.getGap() };
+        },
+        // Never squish the bar to fit short panes.
+        resize: false,
+        // Called by the tooltip layer on every measure (scroll, resize,
+        // geometry change): recompute the anchor from the CURRENT selection
+        // geometry so the bar stays glued to the document. Placement runs in
+        // the scroller's visible frame (clamps use the pane's real bounds);
+        // the returned rect is in client coordinates — the layer converts it
+        // into its own frame.
+        getCoords: () => {
+            const from = view.coordsAtPos(spec.from);
+            // side=-1 for the end: coordsAtPos defaults to the element
+            // AFTER the position, and at a line-wrap point that is the
+            // first character of the NEXT line — a selection ending in the
+            // line's final space would falsely read as multi-line. The
+            // element before the position (the last selected character)
+            // is on the correct line.
+            const to = view.coordsAtPos(spec.to, -1);
+            if (!from || !to) {
+                // The layer's runtime handles a null anchor (hides the bar
+                // until the selection scrolls back into measured range) even
+                // though the public type only admits Rect.
+                return null as unknown as Rect;
+            }
+            // Multi-line detection via geometry: start and end on different
+            // visual lines (hard newline OR soft wrap) have different top
+            // coordinates — a sliceDoc "\n" check would miss wrapped
+            // paragraphs.
+            const multiLine = Math.abs(to.top - from.top) > 1;
+            const scroller = view.scrollDOM;
+            const scrollerRect = scroller.getBoundingClientRect();
+            const originX = scrollerRect.left + scroller.clientLeft;
+            const originY = scrollerRect.top + scroller.clientTop;
+            const contentRect = view.contentDOM.getBoundingClientRect();
+            const width = menu.offsetWidth || 260;
+            const height = menu.offsetHeight || 34;
+            const left = resolveMenuLeft(
+                spec.getPlacement(),
+                from.left - originX,
+                contentRect.left - originX,
+                multiLine,
+                (from.left + to.right) / 2 - originX,
+                width,
+                scroller.clientWidth
+            );
+            const { left: finalLeft } = computeMenuPosition(
+                {
+                    left,
+                    top: Math.min(from.top, to.top) - originY,
+                    bottom: Math.max(from.bottom, to.bottom) - originY,
+                },
+                { width, height },
+                { width: scroller.clientWidth, height: scroller.clientHeight },
+                spec.getSide(),
+                contentRect.right - originX,
+                spec.getPullIn()
+            );
+            return {
+                left: finalLeft + originX,
+                top: Math.min(from.top, to.top),
+                bottom: Math.max(from.bottom, to.bottom),
+                right: finalLeft + originX + width,
+            };
+        },
+        destroy: () => {
+            host.currentMenu = null;
+            host.menuOpen = false;
+            document.body.classList.remove("inscribe-menu-open");
+        },
+    };
+}
+
 export function selectionMenuPlugin(
     run: SelectionMenuRunner,
     getPlacement: () => SelectionMenuPlacement,
     getSide: () => SelectionMenuSide,
-    getPullIn: () => boolean
+    getPullIn: () => boolean,
+    getGap: () => number
 ) {
     return ViewPlugin.fromClass(
-        class {            view: EditorView;
-            menu: HTMLElement | null = null;
+        class SelectionMenuView implements SelectionMenuHost {
+            view: EditorView;
+            currentMenu: HTMLElement | null = null;
+            menuOpen = false;
             thinking = true;
             private refreshTimer: number | null = null;
             private readonly SHOW_DELAY_MS = 350;
             private onKeyDown = (e: KeyboardEvent) => {
-                if (!this.menu || this.menu.style.display === "none") return;
+                if (!this.menuOpen) return;
                 if (e.key === "Escape") {
                     e.preventDefault();
                     e.stopPropagation();
@@ -101,7 +303,7 @@ export function selectionMenuPlugin(
                 }
             };
             private onMouseDown = (e: MouseEvent) => {
-                if (this.menu && this.menu.style.display !== "none" && !this.menu.contains(e.target as Node)) {
+                if (this.menuOpen && this.currentMenu && !this.currentMenu.contains(e.target as Node)) {
                     this.hide();
                 }
             };
@@ -120,8 +322,10 @@ export function selectionMenuPlugin(
                 document.body.classList.remove("inscribe-menu-open");
                 document.removeEventListener("keydown", this.onKeyDown, true);
                 document.removeEventListener("mousedown", this.onMouseDown, true);
-                this.menu?.remove();
-                this.menu = null;
+                // The tooltip layer removes the menu DOM itself on view
+                // destruction; just drop our references.
+                this.currentMenu = null;
+                this.menuOpen = false;
             }
 
             update(update: ViewUpdate) {
@@ -132,177 +336,83 @@ export function selectionMenuPlugin(
                         this.hide();
                         return;
                     }
-                    // Show is debounced: while the user drags the selection the
-                    // timer keeps resetting, so the menu pops up only once the
-                    // selection has settled (and never follows the cursor).
+                    // Show is debounced: while the user drags the selection
+                    // the timer keeps resetting, so the menu pops up only
+                    // once the selection has settled (and never follows the
+                    // cursor).
                     this.scheduleShow();
-                } else if (update.geometryChanged) {
-                    // Scroll/resize: reposition an already-visible menu right
-                    // away. coordsAtPos() is forbidden during the update cycle,
-                    // so defer to a microtask.
-                    if (this.menu && this.menu.style.display !== "none") {
-                        queueMicrotask(() => this.refresh());
-                    }
                 }
+                // Scroll/resize need no handling here: the tooltip layer
+                // re-measures and re-anchors the menu via getCoords().
             }
 
             private scheduleShow() {
                 if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
                 this.refreshTimer = window.setTimeout(() => {
                     this.refreshTimer = null;
-                    this.refresh();
+                    this.show();
                 }, this.SHOW_DELAY_MS);
             }
 
-            private refresh() {
+            private show() {
                 const sel = this.view.state.selection.main;
                 if (sel.empty || sel.from === sel.to) {
                     this.hide();
                     return;
                 }
                 const from = this.view.coordsAtPos(sel.from);
-                // side=-1 for the end: coordsAtPos defaults to the element
-                // AFTER the position, and at a line-wrap point that is the
-                // first character of the NEXT line — a selection ending in the
-                // line's final space would falsely read as multi-line. The
-                // element before the position (the last selected character)
-                // is on the correct line.
                 const to = this.view.coordsAtPos(sel.to, -1);
                 if (!from || !to) {
                     this.hide();
                     return;
                 }
-                // Multi-line detection via geometry: start and end on
-                // different visual lines (hard newline OR soft wrap) have
-                // different top coordinates — a sliceDoc "\n" check would miss
-                // wrapped paragraphs.
-                const multiLine = Math.abs(to.top - from.top) > 1;
-                const contentRect = this.view.contentDOM.getBoundingClientRect();
-                this.show({
-                    fromLeft: from.left,
-                    contentLeft: contentRect.left,
-                    contentRight: contentRect.right,
-                    multiLine,
-                    midX: (from.left + to.right) / 2,
-                    top: Math.min(from.top, to.top),
-                    bottom: Math.max(from.bottom, to.bottom),
+                this.view.dispatch({
+                    effects: setSelectionMenuTooltip.of({
+                        from: sel.from,
+                        to: sel.to,
+                        plugin: this,
+                        getPlacement,
+                        getSide,
+                        getPullIn,
+                        getGap,
+                    }),
                 });
             }
 
-            private show(anchor: {
-                fromLeft: number;
-                contentLeft: number;
-                contentRight: number;
-                multiLine: boolean;
-                midX: number;
-                top: number;
-                bottom: number;
-            }) {
-                if (!this.menu) this.build();
-                const menu = this.menu!;
-                menu.style.display = "flex";
-                // Keep the selection highlight visible even when the editor
-                // loses focus to the menu's input (Obsidian themes hide the
-                // selection on blur). Removed in hide()/destroy().
-                document.body.classList.add("inscribe-menu-open");
-                const width = menu.offsetWidth || 260;
-                const left = resolveMenuLeft(
-                    getPlacement(),
-                    anchor.fromLeft,
-                    anchor.contentLeft,
-                    anchor.multiLine,
-                    anchor.midX,
-                    width,
-                    window.innerWidth
-                );
-                const { left: finalLeft, top } = computeMenuPosition(
-                    { left, top: anchor.top, bottom: anchor.bottom },
-                    { width, height: menu.offsetHeight || 34 },
-                    { width: window.innerWidth, height: window.innerHeight },
-                    getSide(),
-                    anchor.contentRight,
-                    getPullIn()
-                );
-                menu.style.left = `${finalLeft}px`;
-                menu.style.top = `${top}px`;
-            }
-
-            private hide() {
+            hide() {
                 if (this.refreshTimer !== null) {
                     window.clearTimeout(this.refreshTimer);
                     this.refreshTimer = null;
                 }
+                // Drop the references immediately so the decorations and
+                // outside-click/escape handlers stop treating the bar as
+                // open; the tooltip's destroy() callback repeats this when
+                // the layer actually removes the DOM.
                 document.body.classList.remove("inscribe-menu-open");
-                if (this.menu) this.menu.style.display = "none";
-            }
-
-            private build() {
-                const menu = document.createElement("div");
-                menu.className = "inscribe-selection-menu";
-                menu.style.display = "none";
-                menu.addEventListener("mousedown", (e) => e.preventDefault()); // keep the selection
-
-                for (const preset of REWRITE_PRESETS) {
-                    const btn = document.createElement("button");
-                    btn.className = "inscribe-selection-btn";
-                    setIcon(btn, PRESET_ICONS[preset.id] ?? "sparkles");
-                    setTooltip(btn, preset.label, { placement: "top" });
-                    btn.addEventListener("click", () => {
-                        void this.act(preset.instruction);
-                    });
-                    menu.append(btn);
-                }
-
-                const divider = document.createElement("span");
-                divider.className = "inscribe-selection-divider";
-                menu.append(divider);
-
-                const input = document.createElement("input");
-                input.className = "inscribe-selection-input";
-                input.type = "text";
-                input.placeholder = "Ask AI anything…";
-                input.addEventListener("mousedown", (e) => e.stopPropagation());
-                input.addEventListener("keydown", (e) => {
-                    e.stopPropagation();
-                    if (e.key === "Enter") {
-                        const value = input.value.trim();
-                        if (value) {
-                            void this.act(value);
-                            input.value = "";
-                        }
+                this.currentMenu = null;
+                this.menuOpen = false;
+                // Dispatch may be triggered from inside update(); defer so
+                // the transaction lands after the current cycle.
+                queueMicrotask(() => {
+                    if (this.view.state.field(selectionMenuTooltipField, false) !== null) {
+                        this.view.dispatch({ effects: setSelectionMenuTooltip.of(null) });
                     }
                 });
-                menu.append(input);
-                menu.append(divider.cloneNode(true));
-                const think = document.createElement("button");
-                think.className = "inscribe-selection-btn";
-                setIcon(think, "brain");
-                think.classList.toggle("is-active", this.thinking);
-                setTooltip(think, `Thinking: ${this.thinking ? "on" : "off"}`, { placement: "top" });
-                think.addEventListener("click", () => {
-                    this.thinking = !this.thinking;
-                    think.classList.toggle("is-active", this.thinking);
-                    setTooltip(think, `Thinking: ${this.thinking ? "on" : "off"}`, { placement: "top" });
-                });
-                menu.append(think);
-
-                document.body.append(menu);
-                this.menu = menu;
             }
 
-            private async act(instruction: string) {
-                const ok = await run(instruction, this.thinking);
-                if (ok) this.hide();
+            run(instruction: string, thinking: boolean): Promise<boolean> {
+                return run(instruction, thinking);
             }
         },
         {
             // While the menu is open and the editor is unfocused (e.g. the
             // user clicked the input), draw our own selection highlight —
             // themes may hide the native one on blur, which is confusing.
-            // Skipped while a diff session is active (it has its own highlight).
-            decorations: (plugin: { view: EditorView; menu: HTMLElement | null }): DecorationSet => {
+            // Skipped while a diff session is active (it has its own
+            // highlight).
+            decorations: (plugin: { view: EditorView; menuOpen: boolean }): DecorationSet => {
                 const v = plugin.view;
-                if (v.hasFocus || !plugin.menu || plugin.menu.style.display === "none") return Decoration.none;
+                if (v.hasFocus || !plugin.menuOpen) return Decoration.none;
                 if (v.state.field(diffSessionState, false)) return Decoration.none;
                 const sel = v.state.selection.main;
                 if (sel.empty) return Decoration.none;
@@ -310,6 +420,12 @@ export function selectionMenuPlugin(
                     Decoration.mark({ class: "inscribe-menu-selection" }).range(sel.from, sel.to),
                 ]);
             },
+            provide: () => [
+                selectionMenuTooltipField,
+                // Clamp/flip the bar against the editor pane instead of the
+                // whole window (the tooltip system's default space).
+                tooltips({ tooltipSpace: (view) => view.scrollDOM.getBoundingClientRect() }),
+            ],
         }
     );
 }

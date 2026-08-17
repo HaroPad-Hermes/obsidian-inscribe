@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view';
 import { inlineSuggestions } from "./extension";
 import { diffSessionState, setDiffEffect } from "./extension/diff";
 import { selectionMenuPlugin } from "./extension/selection-menu";
+import { generateBarPlugin } from "./extension/generate-bar";
 import { Settings, DEFAULT_SETTINGS } from './settings/settings';
 import InscribeSettingsTab from './settings/tab';
 import { ProviderFactory } from './providers/factory';
@@ -11,7 +12,6 @@ import CompletionService from './completions/service';
 import StatusBarItem from './statusbar/statusbar';
 import { PromptModal } from './settings/prompt-modal';
 import { RewriteModal } from './settings/rewrite-modal';
-import { GenerateModal } from './settings/generate-modal';
 import { deepMerge } from './settings/load';
 import { ArbiterServerManager } from './server-manager';
 import { join } from 'path';
@@ -91,7 +91,7 @@ export default class Inscribe extends Plugin {
 			id: "generate-text",
 			name: "Generate text with AI",
 			callback: () => {
-				new GenerateModal(this.app, this.completionService).open();
+				this.openGenerateBar();
 			},
 		});
 
@@ -102,13 +102,26 @@ export default class Inscribe extends Plugin {
 					item.setTitle("Generate with AI…")
 						.setIcon("sparkles")
 						.onClick(() => {
-							new GenerateModal(this.app, this.completionService).open();
+							this.openGenerateBar();
 						});
 				});
 			})
 		);
 
 		await this.setupExtension();
+	}
+
+	// Open the inline generate prompt bar at the cursor of the active note
+	// (replaces the old full-screen modal).
+	private generateBar: ReturnType<typeof generateBarPlugin> | null = null;
+	private openGenerateBar() {
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const cm = (view?.editor as unknown as { cm?: EditorView }).cm;
+		if (!cm || !this.generateBar) {
+			new Notice("Open a markdown note first");
+			return;
+		}
+		cm.plugin(this.generateBar)?.open();
 	}
 
 	async setupExtension() {
@@ -131,9 +144,16 @@ export default class Inscribe extends Plugin {
 			},
 			() => this.settings.suggestionControl.selectionMenuPlacement,
 			() => this.settings.suggestionControl.selectionMenuSide,
-			() => this.settings.suggestionControl.selectionMenuPullIn
+			() => this.settings.suggestionControl.selectionMenuPullIn,
+			() => this.settings.suggestionControl.selectionMenuGap
 		);
-		this.registerEditorExtension([extension, diffSessionState, selectionMenu]);
+		const generateBar = generateBarPlugin(
+			(instruction, thinking, signal) =>
+				this.completionService.generateTextStream(instruction, thinking, signal),
+			() => this.settings.suggestionControl.selectionMenuGap
+		);
+		this.generateBar = generateBar;
+		this.registerEditorExtension([extension, diffSessionState, selectionMenu, generateBar]);
 	}
 
 	async loadSettings() {

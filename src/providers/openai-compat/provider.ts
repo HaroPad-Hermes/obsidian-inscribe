@@ -79,6 +79,36 @@ export class OpenAICompatibleProvider implements Provider {
         return response.choices[0]?.message?.content || "";
     }
 
+    // Streaming variant of generateOnce: yields the accumulated text as
+    // chunks arrive, so the caller can render the output incrementally.
+    // Aborts via the caller's AbortSignal (passed to the client request).
+    async *streamOnce(
+        messages: ChatMessage[],
+        opts: GenerateOnceOptions,
+        signal?: AbortSignal
+    ): AsyncGenerator<string> {
+        const stream = await this.client.chat.completions.create(
+            {
+                model: opts.model,
+                messages,
+                temperature: opts.temperature,
+                max_tokens: opts.maxTokens,
+                stream: true,
+                ...this.buildExtraParams(opts.thinking),
+            },
+            { signal }
+        );
+        let completion = "";
+        for await (const chunk of stream) {
+            // Reasoning deltas carry no content — skip them so the caller's
+            // first yield is actual output.
+            const content = chunk.choices[0]?.delta?.content || "";
+            if (!content) continue;
+            completion += content;
+            yield completion;
+        }
+    }
+
     // FIM: raw completion against {base}/beta/completions (sibling of /v1),
     // with the post-cursor text as a positional anchor. The model writes the
     // middle between prompt and suffix.

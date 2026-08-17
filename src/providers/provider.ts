@@ -32,6 +32,9 @@ export interface Provider {
     // Optional non-streaming single call — used by the two-prompt (plate-mode) flow.
     // Providers without it fall back to the streaming path.
     generateOnce?: (messages: ChatMessage[], opts: GenerateOnceOptions) => Promise<string>;
+    // Streaming single call — yields the accumulated text as chunks arrive so
+    // the caller can render the output incrementally (generate flows).
+    streamOnce?: (messages: ChatMessage[], opts: GenerateOnceOptions, signal?: AbortSignal) => AsyncGenerator<string>;
     // FIM (fill-in-the-middle): raw completion with a suffix anchor. Providers
     // that expose a suffix-FIM endpoint (e.g. DeepSeek /beta/completions) use
     // this for continuations; others fall back to the chat path.

@@ -282,12 +282,18 @@ export default class CompletionService {
 
     // Generate new text from scratch at the cursor (or replacing the current
     // selection). The whole document around the cursor is sent as context
-    // (up to 20000 chars each side), with a <cursor> marker. Returns the diff
-    // session so the result shows as an inline Accept/Discard insertion.
-    async generateText(instruction: string, thinking: boolean): Promise<DiffSession | null> {
+    // (up to 20000 chars each side), with a <cursor> marker. Streaming: yields
+    // the growing text so the caller can render it incrementally (inline diff
+    // preview) instead of waiting for the full generation. Providers without
+    // streamOnce fall back to a single non-streaming yield.
+    async *generateTextStream(
+        instruction: string,
+        thinking: boolean,
+        signal?: AbortSignal
+    ): AsyncGenerator<string> {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         const editor = view?.editor;
-        if (!editor) return null;
+        if (!editor) return;
 
         const profile = this.profileService.getActiveProfile();
         const provider = this.providerFactory.getProvider(profile.provider);
@@ -302,25 +308,19 @@ export default class CompletionService {
             before: fullText.slice(0, from),
             after: fullText.slice(to),
         });
-
-        try {
-            const result = await provider.generateOnce!(messages, {
-                model: options.model,
-                maxTokens: 4000, // thinking-enabled generation needs headroom (reasoning tokens count against the budget)
-                temperature: 0.7,
-                thinking: thinking ? "enabled" : "disabled",
-            });
-            const generated = normalizeListLineBreaks((result || "").trim());
-            if (!generated) {
-                new Notice("Inscribe: the model returned nothing");
-                return null;
-            }
-            return { from, to, original: editor.getSelection(), rewritten: generated };
-        } catch (error) {
-            console.error("Inscribe: generate failed", error);
-            new Notice("Inscribe: generate failed — see console");
-            return null;
+        const opts = {
+            model: options.model,
+            maxTokens: 4000, // thinking-enabled generation needs headroom (reasoning tokens count against the budget)
+            temperature: 0.7,
+            thinking: thinking ? ("enabled" as const) : ("disabled" as const),
+        };
+        if (provider.streamOnce) {
+            yield* provider.streamOnce(messages, opts, signal);
+            return;
         }
+        // Non-streaming fallback: yield the full result in one chunk.
+        const result = await provider.generateOnce!(messages, opts);
+        if (result) yield result;
     }
 
     private buildSystemPrompt(options: ProfileOptions): string {

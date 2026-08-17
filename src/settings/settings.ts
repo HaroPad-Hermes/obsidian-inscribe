@@ -68,6 +68,8 @@ export type SuggestionControl = {
     // Soft pull-in: shift the menu left by half the overflow when it would
     // stick out past the text field's right edge.
     selectionMenuPullIn: boolean,
+    // Vertical gap (px) between the selection and the menu bar.
+    selectionMenuGap: number,
     outputLimit: {
         enabled: boolean,
         sentences: number,
@@ -126,6 +128,7 @@ export const DEFAULT_SETTINGS: Settings = {
         selectionMenuPlacement: "smart",
         selectionMenuSide: "below",
         selectionMenuPullIn: true,
+        selectionMenuGap: 6,
         outputLimit: {
             enabled: true,
             sentences: 1,
