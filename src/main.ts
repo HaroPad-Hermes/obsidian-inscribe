@@ -131,7 +131,8 @@ export default class Inscribe extends Plugin {
 			},
 			() => this.settings.suggestionControl.selectionMenuPlacement,
 			() => this.settings.suggestionControl.selectionMenuSide,
-			() => this.settings.suggestionControl.selectionMenuPullIn
+			() => this.settings.suggestionControl.selectionMenuPullIn,
+			() => this.settings.suggestionControl.selectionMenuGap
 		);
 		this.registerEditorExtension([extension, diffSessionState, selectionMenu]);
 	}

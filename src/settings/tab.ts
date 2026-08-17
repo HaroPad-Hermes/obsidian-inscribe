@@ -162,6 +162,20 @@ class SuggestionControlSection {
                     });
             });
 
+        new Setting(this.container)
+            .setName("Selection menu gap")
+            .setDesc("Vertical distance between the highlighted text and the bar, in px (applies on both the below and above sides).")
+            .addSlider((slider) => {
+                slider
+                    .setLimits(0, 30, 1)
+                    .setValue(this.plugin.settings.suggestionControl.selectionMenuGap)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.suggestionControl.selectionMenuGap = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
         // Plate Mode (one-click plate-editor-style setup)
         new Setting(this.container)
             .setName("Plate mode")

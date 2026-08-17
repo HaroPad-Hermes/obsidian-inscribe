@@ -151,8 +151,11 @@
 }
 
 /* ── Selection quick-action menu ── */
-.inscribe-selection-menu {
-    position: fixed;
+/* The bar is rendered through CM6's tooltip system; the .cm-tooltip class
+   comes from the library, so scope overrides to the combined selector to
+   beat both the base theme and Obsidian's own .cm-tooltip rules. */
+.cm-tooltip.inscribe-selection-menu {
+    position: absolute;
     z-index: 1000;
     display: flex;
     align-items: center;
